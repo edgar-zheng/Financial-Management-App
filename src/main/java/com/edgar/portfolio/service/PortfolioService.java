@@ -1,5 +1,7 @@
 package com.edgar.portfolio.service;
 
+import java.util.Optional;
+
 import org.springframework.stereotype.Service;
 
 import com.edgar.portfolio.entity.Portfolio;
@@ -16,5 +18,9 @@ public class PortfolioService {
 
 	public Portfolio createPortfolio(String name) {
 		return portfolioRepository.save(new Portfolio(name));
+	}
+
+	public Optional<Portfolio> getPortfolioById(Long id) {
+		return portfolioRepository.findById(id);
 	}
 }
