@@ -1,0 +1,6 @@
+body { font-family: system-ui, sans-serif; margin: 2rem; color: #222; }
+main { max-width: 40rem; margin: auto; }
+form { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+input, button { font: inherit; padding: 0.5rem; }
+input { width: 8rem; }
+[role="alert"] { color: #a11; }
