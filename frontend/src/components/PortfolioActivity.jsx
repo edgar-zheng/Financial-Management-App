@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import TransactionForm from './TransactionForm.jsx'
 import TransactionHistory from './TransactionHistory.jsx'
 import HoldingsTable from './HoldingsTable.jsx'
+import PortfolioAnalytics from './PortfolioAnalytics.jsx'
 
 export default function PortfolioActivity({ portfolioId }) {
   const [revision, setRevision] = useState(0)
@@ -34,6 +35,7 @@ export default function PortfolioActivity({ portfolioId }) {
 
   return (
     <>
+      <PortfolioAnalytics key={`${portfolioId}-${revision}`} portfolioId={portfolioId} />
       <TransactionForm portfolioId={portfolioId} onCreated={refresh} />
       <button type="button" onClick={refresh}>Refresh history and holdings</button>
       {!data && !error && <p role="status">Loading history and holdings…</p>}
