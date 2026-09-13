@@ -7,10 +7,14 @@ export default function PortfolioActivity({ portfolioId }) {
   const [revision, setRevision] = useState(0)
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
+  const [valuations, setValuations] = useState(null)
+  const [priceError, setPriceError] = useState('')
 
   function refresh() {
     setData(null)
     setError('')
+    setValuations(null)
+    setPriceError('')
     setRevision(value => value + 1)
   }
 
@@ -28,7 +32,23 @@ export default function PortfolioActivity({ portfolioId }) {
         if (!controller.signal.aborted) setError(`${error.message} Use Refresh history and holdings to try again.`)
       }
     }
+    async function loadValuations() {
+      try {
+        const response = await fetch(`/api/portfolios/${portfolioId}/holdings/valuation`, {
+          signal: controller.signal,
+        })
+        if (!response.ok) {
+          const body = await response.json().catch(() => null)
+          throw new Error(body?.message || `Unable to load market values (${response.status}).`)
+        }
+        const values = await response.json()
+        if (!controller.signal.aborted) setValuations(values)
+      } catch (error) {
+        if (!controller.signal.aborted) setPriceError(error.message)
+      }
+    }
     load()
+    loadValuations()
     return () => controller.abort()
   }, [portfolioId, revision])
 
@@ -40,7 +60,7 @@ export default function PortfolioActivity({ portfolioId }) {
       {error && <p role="alert">{error}</p>}
       {data && <>
         <TransactionHistory transactions={data.transactions} />
-        <HoldingsTable holdings={data.holdings} />
+        <HoldingsTable holdings={data.holdings} valuations={valuations} priceError={priceError} />
       </>}
     </>
   )
