@@ -40,7 +40,12 @@ public class HoldingService {
 				case BUY -> transaction.getQuantity();
 				case SELL -> transaction.getQuantity().negate();
 			};
-			quantities.merge(symbol, quantity, BigDecimal::add);
+			BigDecimal existingQuantity = quantities.get(symbol);
+			if (existingQuantity == null) {
+				quantities.put(symbol, quantity);
+			} else {
+				quantities.put(symbol, existingQuantity.add(quantity));
+			}
 		}
 
 		return quantities.entrySet().stream()

@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.edgar.portfolio.dto.MarketPriceDto;
@@ -12,6 +13,7 @@ import com.edgar.portfolio.service.HoldingValuationService;
 import com.edgar.portfolio.dto.HoldingValuationDto;
 
 @RestController
+@RequestMapping("/api")
 public class MarketDataController {
 
 	private final MarketDataService marketData;
@@ -22,17 +24,17 @@ public class MarketDataController {
 		this.valuations = valuations;
 	}
 
-	@GetMapping("/api/market/prices/{symbol}")
+	@GetMapping("/market/prices/{symbol}")
 	public MarketPriceDto getPrice(@PathVariable("symbol") String symbol) {
 		return marketData.getLatestClosingPrice(symbol);
 	}
 
-	@GetMapping("/api/portfolios/{id}/prices")
+	@GetMapping("/portfolios/{id}/prices")
 	public List<MarketPriceDto> getPortfolioPrices(@PathVariable("id") Long id) {
 		return valuations.getPortfolioPrices(id);
 	}
 
-	@GetMapping("/api/portfolios/{id}/holdings/valuation")
+	@GetMapping("/portfolios/{id}/holdings/valuation")
 	public List<HoldingValuationDto> getValuations(@PathVariable("id") Long id) {
 		return valuations.getValuations(id);
 	}
