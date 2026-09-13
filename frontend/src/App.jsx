@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import PortfolioActivity from './components/PortfolioActivity.jsx'
 
 export default function App() {
   const [name, setName] = useState('')
@@ -72,6 +73,8 @@ export default function App() {
       }
       const data = await response.json()
       setCreatedPortfolio(data)
+      setInputId(String(data.id))
+      setRequest(previous => ({ id: String(data.id), revision: previous.revision + 1 }))
       setName('')
     } catch (error) {
       setCreateError(error instanceof TypeError
@@ -117,6 +120,7 @@ export default function App() {
         <section aria-label="Portfolio details">
           <h2>Portfolio: {portfolio.name}</h2>
           <p>ID: {portfolio.id}</p>
+          <PortfolioActivity key={portfolio.id} portfolioId={portfolio.id} />
         </section>
       )}
     </main>
