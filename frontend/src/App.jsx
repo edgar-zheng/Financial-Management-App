@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
 
 export default function App() {
+  const [name, setName] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [createdPortfolio, setCreatedPortfolio] = useState(null)
+  const [createError, setCreateError] = useState('')
   const [inputId, setInputId] = useState('1')
   const [request, setRequest] = useState({ id: '1', revision: 0 })
   const [portfolio, setPortfolio] = useState(null)
@@ -45,9 +49,62 @@ export default function App() {
     setRequest(previous => ({ id: inputId, revision: previous.revision + 1 }))
   }
 
+  async function createPortfolio(event) {
+    event.preventDefault()
+    if (creating) return
+    setCreatedPortfolio(null)
+    setCreateError('')
+    const trimmedName = name.trim()
+    if (!trimmedName) {
+      setCreateError('Portfolio name must not be blank.')
+      return
+    }
+    setCreating(true)
+    try {
+      const response = await fetch('/api/portfolios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmedName }),
+      })
+      if (!response.ok) {
+        const body = await response.json().catch(() => null)
+        throw new Error(body?.fieldErrors?.name || body?.message || 'Unable to create portfolio.')
+      }
+      const data = await response.json()
+      setCreatedPortfolio(data)
+      setName('')
+    } catch (error) {
+      setCreateError(error instanceof TypeError
+        ? 'Unable to confirm creation. Check the backend before retrying.'
+        : error.message)
+    } finally {
+      setCreating(false)
+    }
+  }
+
   return (
     <main>
       <h1>Portfolio Tracker</h1>
+      <section aria-labelledby="create-heading">
+        <h2 id="create-heading">Create a portfolio</h2>
+        <form onSubmit={createPortfolio}>
+          <label htmlFor="portfolio-name">Portfolio Name</label>
+          <input id="portfolio-name" required maxLength={255} value={name}
+            disabled={creating} onChange={event => setName(event.target.value)}
+            placeholder="My Portfolio" />
+          <button type="submit" disabled={creating}>
+            {creating ? 'Creating…' : 'Create Portfolio'}
+          </button>
+        </form>
+        {createError && <p role="alert">{createError}</p>}
+        {createdPortfolio && (
+          <div role="status">
+            <p>Portfolio created successfully.</p>
+            <pre>{JSON.stringify(createdPortfolio, null, 2)}</pre>
+          </div>
+        )}
+      </section>
+      <h2>Find a portfolio</h2>
       <form onSubmit={submit}>
         <label htmlFor="portfolio-id">Portfolio ID</label>
         <input id="portfolio-id" type="text" inputMode="numeric" pattern="[1-9][0-9]*"
