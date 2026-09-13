@@ -49,8 +49,10 @@ public class PortfolioAnalyticsService {
 		}
 
 		var holdings = valuations.getValuations(portfolioId);
-		BigDecimal total = holdings.stream().map(holding -> holding.marketValue())
-				.reduce(BigDecimal.ZERO, BigDecimal::add);
+		BigDecimal total = BigDecimal.ZERO;
+		for (var holding : holdings) {
+			total = total.add(holding.marketValue());
+		}
 		BigDecimal cost = BigDecimal.ZERO;
 		var assets = new ArrayList<AssetAllocationDto>();
 		for (var holding : holdings) {

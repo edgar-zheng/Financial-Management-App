@@ -1,0 +1,5 @@
+{"properties":[
+ {"name":"market.api.key","type":"java.lang.String","description":"Server-side Massive credential. Supply through local configuration or environment."},
+ {"name":"market.api.base-url","type":"java.lang.String","defaultValue":"https://api.massive.com"},
+ {"name":"market.cache.ttl","type":"java.time.Duration","defaultValue":"6h"}
+]}
