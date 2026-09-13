@@ -1,7 +1,7 @@
 # Portfolio Tracker
 
-Spring Boot backend and React frontend in one repository. The backend remains at
- the repository root (`src/`, `pom.xml`, `mvnw`); the React application is in `frontend/`.
+Spring Boot backend and React frontend in one repository. The backend is in `backend/` (`pom.xml` and `src/`); the React application is in
+`frontend/`. The Maven wrapper (`mvnw`, `mvnw.cmd`, `.mvn/`) stays at the repository root.
 
 ## Run locally
 
@@ -9,11 +9,11 @@ Prerequisites: Java 21, local MySQL with the `portfolio_tracker` database, and a
 current Node.js LTS version supported by Vite (Node 22.12+ or newer).
 
 1. Configure your local database password in
-   `src/main/resources/application-env.properties` using `spring.datasource.password`.
+   `backend/src/main/resources/application-env.properties` using `spring.datasource.password`.
    Keep credentials out of frontend files; browser code is public.
 2. From the repository root, start the backend:
    ```sh
-   ./mvnw spring-boot:run
+   ./mvnw -f backend/pom.xml spring-boot:run
    ```
 3. In a second terminal:
    ```sh
@@ -34,7 +34,7 @@ Content-Type `application/json`, body `{"name":"Retirement Account"}`. Use the r
 
 ## Verify before committing
 
-- Run `./mvnw test` from the repository root (requires MySQL).
+- Run `./mvnw -f backend/pom.xml test` from the repository root (requires MySQL).
 - Run `npm run build` from `frontend/` to check the production build.
 - Check the browser shows the same name and ID as the backend response.
 - Try a nonexistent ID: the page should display **Portfolio not found.**
