@@ -33,6 +33,8 @@ public class PortfolioController {
 
 	@GetMapping("/{id}")
 	public ResponseEntity<Portfolio> getPortfolioById(@PathVariable("id") Long id) {
-		return ResponseEntity.of(portfolioService.getPortfolioById(id));
+		return ResponseEntity.ok(portfolioService.getPortfolioById(id)
+				.orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+						HttpStatus.NOT_FOUND, "Portfolio not found")));
 	}
 }

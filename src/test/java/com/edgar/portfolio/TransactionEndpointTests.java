@@ -34,7 +34,8 @@ class TransactionEndpointTests {
 
 	@BeforeEach
 	void setUp() {
-		mvc = MockMvcBuilders.standaloneSetup(controller).build();
+		mvc = MockMvcBuilders.standaloneSetup(controller)
+				.setControllerAdvice(new com.edgar.portfolio.exception.GlobalExceptionHandler()).build();
 		portfolioId = portfolios.saveAndFlush(new Portfolio("Endpoint test")).getId();
 	}
 
@@ -85,12 +86,37 @@ class TransactionEndpointTests {
 	void rejectsInvalidRequestsWithoutSaving() throws Exception {
 		long before = transactions.count();
 		for (String body : new String[] {"{}", VALID.replace("AAPL", "   "),
-				VALID.replace("BUY", "INVALID"), VALID.replace("1.25", "0"),
+				VALID.replace("BUY", "INVALID"), VALID.replace("1.25", "0"), VALID.replace("1.25", "-1"),
 				VALID.replace("1.25", "null"), VALID.replace("200.12345678", "-1"),
 				VALID.replace("1.25", "1.123456789")}) {
 			mvc.perform(post(path(portfolioId)).contentType(MediaType.APPLICATION_JSON).content(body))
-					.andExpect(status().isBadRequest());
+					.andExpect(status().isBadRequest()).andExpect(jsonPath("$.status").value(400));
 		}
 		assertEquals(before, transactions.count());
 	}
+	@Test
+	void rejectsOversellsAndAllowsSellingExactBalance() throws Exception {
+		mvc.perform(post(path(portfolioId)).contentType(MediaType.APPLICATION_JSON).content(VALID))
+				.andExpect(status().isCreated());
+		long before = transactions.count();
+		mvc.perform(post(path(portfolioId)).contentType(MediaType.APPLICATION_JSON)
+				.content(VALID.replace("BUY", "SELL").replace("1.25", "2")))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.status").value(409));
+		assertEquals(before, transactions.count());
+		mvc.perform(post(path(portfolioId)).contentType(MediaType.APPLICATION_JSON)
+				.content(VALID.replace("BUY", "SELL").replace("AAPL", " aapl ")))
+				.andExpect(status().isCreated());
+	}
+
+	@Test
+	void cannotSellSharesOwnedOnlyInAnotherPortfolio() throws Exception {
+		Long other = portfolios.saveAndFlush(new Portfolio("Other")).getId();
+		mvc.perform(post(path(other)).contentType(MediaType.APPLICATION_JSON).content(VALID))
+				.andExpect(status().isCreated());
+		mvc.perform(post(path(portfolioId)).contentType(MediaType.APPLICATION_JSON)
+				.content(VALID.replace("BUY", "SELL")))
+				.andExpect(status().isConflict());
+	}
+
 }

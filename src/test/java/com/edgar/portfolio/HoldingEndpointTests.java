@@ -35,7 +35,8 @@ class HoldingEndpointTests {
 
 	@BeforeEach
 	void setUp() {
-		mvc = MockMvcBuilders.standaloneSetup(controller).build();
+		mvc = MockMvcBuilders.standaloneSetup(controller)
+				.setControllerAdvice(new com.edgar.portfolio.exception.GlobalExceptionHandler()).build();
 		portfolio = portfolios.saveAndFlush(new Portfolio("Holdings test"));
 	}
 

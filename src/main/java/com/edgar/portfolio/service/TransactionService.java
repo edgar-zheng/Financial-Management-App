@@ -1,6 +1,10 @@
 package com.edgar.portfolio.service;
 
 import java.util.List;
+import java.util.Locale;
+import java.math.BigDecimal;
+import com.edgar.portfolio.entity.TransactionType;
+import com.edgar.portfolio.exception.InsufficientSharesException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,8 +29,22 @@ public class TransactionService {
 
 	@Transactional
 	public TransactionResponse createTransaction(Long portfolioId, CreateTransactionRequest request) {
-		Portfolio portfolio = requirePortfolio(portfolioId);
-		Transaction transaction = new Transaction(portfolio, request.symbol(), request.type(),
+		Portfolio portfolio = portfolios.findByIdForUpdate(portfolioId)
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Portfolio not found"));
+		String symbol = request.symbol().strip().toUpperCase(Locale.ROOT);
+		if (request.type() == TransactionType.SELL) {
+			BigDecimal owned = BigDecimal.ZERO;
+			for (Transaction previous : transactions.findByPortfolioIdOrderByTimestampAscIdAsc(portfolioId)) {
+				if (previous.getSymbol().strip().toUpperCase(Locale.ROOT).equals(symbol)) {
+					owned = owned.add(previous.getType() == TransactionType.BUY
+							? previous.getQuantity() : previous.getQuantity().negate());
+				}
+			}
+			if (request.quantity().compareTo(owned) > 0) {
+				throw new InsufficientSharesException(symbol);
+			}
+		}
+		Transaction transaction = new Transaction(portfolio, symbol, request.type(),
 				request.quantity(), request.price());
 		return TransactionResponse.from(transactions.save(transaction));
 	}
