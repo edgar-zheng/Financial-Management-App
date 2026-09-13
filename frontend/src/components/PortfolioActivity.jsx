@@ -1,3 +1,4 @@
+import AllocationTargets from './AllocationTargets.jsx'
 import { useEffect, useState } from 'react'
 import TransactionForm from './TransactionForm.jsx'
 import TransactionHistory from './TransactionHistory.jsx'
@@ -56,6 +57,7 @@ export default function PortfolioActivity({ portfolioId }) {
   return (
     <>
       <PortfolioAnalytics key={`${portfolioId}-${revision}`} portfolioId={portfolioId} />
+      <AllocationTargets key={`targets-${portfolioId}-${revision}`} portfolioId={portfolioId} />
       <TransactionForm portfolioId={portfolioId} onCreated={refresh} />
       <button type="button" onClick={refresh}>Refresh history and holdings</button>
       {!data && !error && <p role="status">Loading history and holdings…</p>}
