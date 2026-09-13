@@ -45,3 +45,95 @@ Content-Type `application/json`, body `{"name":"Retirement Account"}`. Use the r
 The build output is `frontend/dist/`. Production deployment is not configured:
 its web server must route `/api` to Spring Boot; the Vite development proxy is not
 included in the static build.
+
+## Market data and end-of-day valuation (Massive Stocks Basic)
+
+Credentials still resolve through `market.api.key`; keep the actual value in the
+existing ignored local configuration or environment. Do not put it in frontend
+configuration. Optional `.env` imports use plain Java-properties syntax, without
+shell `export` prefixes or surrounding quotes. No real key is in these examples.
+
+Configuration:
+
+- `market.api.base-url`: defaults to `https://api.massive.com`; can be supplied
+  through `MASSIVE_BASE_URL`. Use HTTPS for any real credential-bearing server.
+- `market.cache.ttl`: defaults to `6h`.
+
+The backend calls `GET /v2/aggs/ticker/{ticker}/prev?adjusted=true` using bearer
+header authentication, and selects the first valid positive closing price (`c`).
+Massive response types stay private to the client. The previous trading session
+is determined by Massive, so weekends/holidays don't trigger a request for a
+nonexistent calendar-day bar. There are no Last Trade, Snapshot, or live-quote calls.
+See [Massive previous-day aggregate documentation](https://massive.com/docs/rest/stocks/aggregates/previous-day-bar).
+
+Existing price routes are preserved:
+
+- `GET /api/market/prices/AAPL`
+- `GET /api/portfolios/1/prices`
+
+Their JSON retains `symbol`, `price`, `asOf`, `currency`, `source`, and `priceType`.
+The price is now a closing price and `priceType` is `PREVIOUS_CLOSE`. `asOf` is the
+aggregate-window start timestamp (UTC, converted from provider milliseconds),
+not the close instant or request time. It is null if the provider omits it.
+
+New route: `GET /api/portfolios/1/holdings/valuation`
+
+Each result includes `symbol`, `quantity`, `closingPrice`, `marketValue`, `asOf`,
+`currency`, and `priceType`. `marketValue = quantity * closingPrice`, calculated
+with BigDecimal without intermediate rounding. HoldingValuationService reuses
+HoldingService's existing quantity calculation, then calls MarketDataService.
+Database work completes before external HTTP requests. Existing portfolio,
+transaction, and quantity-only holdings APIs do not require market prices.
+No stock-split reconciliation or other corporate-action accounting is added.
+
+### Cache and rate limits
+
+A Spring-managed Caffeine cache holds up to 1,000 normalized ticker prices in
+memory for six hours after a successful fetch. This TTL reduces repeated daily
+price requests while allowing refreshed closing data within six hours. Concurrent
+requests for one ticker share a single load; failed fetches are not cached. Cache
+contents are lost on restart and are not shared between application instances.
+
+The cache is not a global rate limiter. More than five distinct uncached symbols
+in a minute can still exceed Basic-plan limits. Requests are sequential and have
+no automatic retries. If a portfolio request fails partway, successful ticker
+prices remain cached; wait at least a minute before retrying a rate-limited call.
+A failed price fails the whole valuation response; no zero or fabricated values
+are substituted. Empty portfolios return `[]` without contacting Massive.
+
+### Errors and logging
+
+The existing GlobalExceptionHandler returns the same `status`, `message`, and
+`fieldErrors` structure:
+
+- 400: invalid ticker format.
+- 404: missing portfolio, provider ticker not found, or empty/missing results.
+- 503: missing key, authentication failure (provider 401), subscription denial
+  (provider 403), or rate limiting (provider 429), with distinct messages.
+- 502: unexpected provider HTTP failure, invalid response, or transport failure.
+
+Debug logging for `com.edgar.portfolio.service.MarketDataService` shows cache
+misses; client debug logs show requested tickers. Warnings identify provider HTTP
+status or transport/decoding failure. Keys, headers, and raw provider errors are
+never logged. Connect timeout is five seconds; read timeout is ten seconds.
+
+### Verify before committing
+
+From the repository root:
+
+```sh
+./mvnw -f backend/pom.xml test
+./mvnw -f backend/pom.xml clean package
+./mvnw -f backend/pom.xml spring-boot:run
+```
+
+All market tests stub the HTTP boundary; they do not use a live Massive key.
+In Postman, request an AAPL price and confirm a positive price and
+`PREVIOUS_CLOSE`. Request a funded portfolio's holdings and valuation, and verify
+quantity times closingPrice equals marketValue. Repeat the price request within
+the TTL; with service debug logging enabled, it should not log another cache miss.
+Check empty and missing portfolios. A Friday session returned on a weekend is
+valid. Actual credential validity and provider access require this manual check.
+
+Review `git status --short` and `git diff`. New files must be inspected directly
+until staged. Do not stage `.env` or local credential files.
