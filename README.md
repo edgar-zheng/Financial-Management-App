@@ -137,3 +137,36 @@ valid. Actual credential validity and provider access require this manual check.
 
 Review `git status --short` and `git diff`. New files must be inspected directly
 until staged. Do not stage `.env` or local credential files.
+
+## Session authentication (backend)
+
+Spring Security loads users from UserRepository and verifies BCrypt hashes.
+All APIs except GET `/api/auth/csrf` and POST `/api/auth/register` and
+`/api/auth/login` require a session. CSRF protection applies to all mutations,
+including registration, login, and logout. Authentication errors return JSON
+401; invalid/missing CSRF tokens return JSON 403. No JWT or HTTP Basic is enabled.
+
+Postman workflow (keep its cookie jar enabled and use the same hostname):
+
+1. GET `http://localhost:8080/api/auth/csrf`. Keep the session cookie and copy
+   `token` into the header named by `headerName` for subsequent POST/PUT requests.
+2. POST `/api/auth/register`, JSON body containing `email` and `password`.
+   Password length: at least 12 characters and at most 72 UTF-8 bytes. Expect 201.
+   Registration does not automatically log in. Duplicate emails return 409.
+3. POST `/api/auth/login` using **x-www-form-urlencoded**, with fields `email`
+   and `password` and the CSRF header. Expect 204 and an authenticated session.
+4. GET `/api/auth/csrf` again after login; authentication rotates the token.
+5. GET `/api/auth/me` should return the email. Portfolio GET requests now work;
+   portfolio/transaction/allocation writes also need the new CSRF header.
+6. POST `/api/auth/logout` with the current CSRF header. Expect 204. Subsequent
+   protected GET requests return 401. Get a fresh CSRF token before logging in again.
+
+The React UI still needs a login/logout screen and CSRF-aware fetch wiring.
+Postman sessions are not shared with the browser. Portfolio ownership is NOT
+implemented in this step: authenticated users currently share access to existing
+portfolio resources. Do not treat this as user-level data isolation.
+Use HTTPS for deployment; session transport security must be configured there.
+
+SecurityIntegrationTests exercise the actual Spring Security filter chain with
+local MySQL and rolled-back fixtures; older standalone controller tests remain
+focused on business/API behavior.
