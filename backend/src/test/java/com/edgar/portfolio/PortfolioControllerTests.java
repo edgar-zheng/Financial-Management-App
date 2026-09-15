@@ -1,7 +1,11 @@
 package com.edgar.portfolio;
 
 import java.time.LocalDateTime;
-import java.util.Optional;
+import com.edgar.portfolio.service.PortfolioAccessService;
+import com.edgar.portfolio.entity.User;
+import com.edgar.portfolio.exception.GlobalExceptionHandler;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,12 +34,15 @@ class PortfolioControllerTests {
 
 	private PortfolioRepository repository;
 	private MockMvc mvc;
+	private PortfolioAccessService access;
 
 	@BeforeEach
 	void setUp() {
 		repository = mock(PortfolioRepository.class);
+		access = mock(PortfolioAccessService.class);
+		when(access.currentUser()).thenReturn(new User("test@example.com", "test-only-hash"));
 		mvc = MockMvcBuilders.standaloneSetup(
-				new PortfolioController(new PortfolioService(repository))).build();
+				new PortfolioController(new PortfolioService(repository, access))).setControllerAdvice(new GlobalExceptionHandler()).build();
 	}
 
 	@Test
@@ -71,22 +78,22 @@ class PortfolioControllerTests {
 		Portfolio portfolio = new Portfolio("Long-Term Investments");
 		ReflectionTestUtils.setField(portfolio, "id", 1L);
 		ReflectionTestUtils.setField(portfolio, "createdAt", LocalDateTime.of(2026, 9, 11, 22, 0));
-		when(repository.findById(1L)).thenReturn(Optional.of(portfolio));
+		when(access.requireOwned(1L)).thenReturn(portfolio);
 
 		mvc.perform(get("/api/portfolios/1"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.id").value(1))
 				.andExpect(jsonPath("$.name").value("Long-Term Investments"))
 				.andExpect(jsonPath("$.createdAt").value("2026-09-11T22:00:00"));
-		verify(repository).findById(1L);
+		verify(access).requireOwned(1L);
 	}
 
 	@Test
 	void returnsNotFoundForMissingPortfolio() throws Exception {
-		when(repository.findById(999L)).thenReturn(Optional.empty());
+		when(access.requireOwned(999L)).thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Portfolio not found"));
 
 		mvc.perform(get("/api/portfolios/999"))
 				.andExpect(status().isNotFound());
-		verify(repository).findById(999L);
+		verify(access).requireOwned(999L);
 	}
 }

@@ -1,6 +1,10 @@
 package com.edgar.portfolio.entity;
 
 import java.time.LocalDateTime;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -23,6 +27,12 @@ public class Portfolio {
 	@Column(nullable = false)
 	private String name;
 
+	// Nullable only for legacy portfolios; API creation always supplies the authenticated owner.
+	@JsonIgnore
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "owner_id", updatable = false)
+	private User owner;
+
 	@Column(nullable = false, updatable = false)
 	private LocalDateTime createdAt;
 
@@ -31,6 +41,11 @@ public class Portfolio {
 
 	public Portfolio(String name) {
 		this.name = name;
+	}
+
+	public Portfolio(String name, User owner) {
+		this.name = name;
+		this.owner = java.util.Objects.requireNonNull(owner);
 	}
 
 	@PrePersist

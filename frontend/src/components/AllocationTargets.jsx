@@ -1,3 +1,4 @@
+import { apiFetch } from '../api.js'
 import { useEffect, useState } from 'react'
 
 export default function AllocationTargets({ portfolioId }) {
@@ -15,7 +16,7 @@ export default function AllocationTargets({ portfolioId }) {
     const controller = new AbortController()
     async function load() {
       try {
-        const response = await fetch(path, { signal: controller.signal })
+        const response = await apiFetch(path, { signal: controller.signal })
         if (!response.ok) throw new Error('Unable to load targets.')
         const data = await response.json()
         if (!controller.signal.aborted) { setRows(data); setReady(true) }
@@ -31,7 +32,7 @@ export default function AllocationTargets({ portfolioId }) {
     setDriftError('')
     async function load() {
       try {
-        const response = await fetch(`${path}/drift`, { signal: controller.signal })
+        const response = await apiFetch(`${path}/drift`, { signal: controller.signal })
         const data = await response.json()
         if (!response.ok) throw new Error(data.message || 'Unable to calculate drift.')
         if (!controller.signal.aborted) setDrift(data)
@@ -46,7 +47,7 @@ export default function AllocationTargets({ portfolioId }) {
     if (saving) return
     setSaving(true); setError(''); setMessage('')
     try {
-      const response = await fetch(path, {
+      const response = await apiFetch(path, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targets: rows }),
       })

@@ -11,16 +11,18 @@ import com.edgar.portfolio.repository.PortfolioRepository;
 public class PortfolioService {
 
 	private final PortfolioRepository portfolioRepository;
+	private final PortfolioAccessService access;
 
-	public PortfolioService(PortfolioRepository portfolioRepository) {
+	public PortfolioService(PortfolioRepository portfolioRepository, PortfolioAccessService access) {
 		this.portfolioRepository = portfolioRepository;
+		this.access = access;
 	}
 
 	public Portfolio createPortfolio(String name) {
-		return portfolioRepository.save(new Portfolio(name));
+		return portfolioRepository.save(new Portfolio(name, access.currentUser()));
 	}
 
 	public Optional<Portfolio> getPortfolioById(Long id) {
-		return portfolioRepository.findById(id);
+		return Optional.of(access.requireOwned(id));
 	}
 }

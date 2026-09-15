@@ -19,3 +19,5 @@ th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #ccc; }
 .analytics-summary div { border: 1px solid #ddd; padding: 1rem; }
 .analytics-summary dd { margin: 0.5rem 0 0; font-size: 1.25rem; font-weight: bold; }
 meter { width: 5rem; }
+
+.session-bar { max-width: 40rem; margin: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }

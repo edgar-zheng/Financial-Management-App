@@ -21,8 +21,8 @@ current Node.js LTS version supported by Vite (Node 22.12+ or newer).
    npm ci
    npm run dev
    ```
-4. Open http://localhost:5173. The page loads portfolio 1 automatically. Enter
-   another existing portfolio ID and click **Load portfolio** to look it up.
+4. Open http://localhost:5173. Sign in or create an account. Create a portfolio, or enter an ID owned by your
+   account and click **Load portfolio**.
 
 The frontend calls `GET /api/portfolios/{id}`. Vite proxies `/api` to the backend
 at http://localhost:8080 during development, so no backend CORS change is needed.
@@ -161,12 +161,51 @@ Postman workflow (keep its cookie jar enabled and use the same hostname):
 6. POST `/api/auth/logout` with the current CSRF header. Expect 204. Subsequent
    protected GET requests return 401. Get a fresh CSRF token before logging in again.
 
-The React UI still needs a login/logout screen and CSRF-aware fetch wiring.
-Postman sessions are not shared with the browser. Portfolio ownership is NOT
-implemented in this step: authenticated users currently share access to existing
-portfolio resources. Do not treat this as user-level data isolation.
+The React UI includes registration, login/logout, session checks, and CSRF-aware fetch wiring.
+Postman sessions are not shared with the browser. Portfolio ownership is enforced for every portfolio-specific resource. Other
+users and ownerless legacy portfolios return 404.
 Use HTTPS for deployment; session transport security must be configured there.
 
 SecurityIntegrationTests exercise the actual Spring Security filter chain with
 local MySQL and rolled-back fixtures; older standalone controller tests remain
 focused on business/API behavior.
+
+
+## Portfolio ownership
+
+New portfolios belong to the authenticated database user. Requests cannot choose
+or change the owner. Owner information is not embedded in portfolio JSON.
+PortfolioAccessService resolves the authenticated user and queries by both
+portfolio ID and owner ID; transaction/target writes keep the existing row lock.
+Transactions, holdings, prices, valuations, analytics, targets, and drift all
+require ownership. Missing and other-user portfolios both return 404. Unauthenticated
+requests are rejected by Spring Security; mutations still require CSRF tokens.
+The standalone symbol-price endpoint remains available to any authenticated user
+because it contains no portfolio data.
+
+Existing portfolios are preserved with nullable `owner_id`. They are inaccessible
+until you deliberately assign them; no registration or login claims old data.
+Inspect in SQLTools without selecting password hashes:
+
+```sql
+SELECT id, email FROM users;
+SELECT id, name, owner_id FROM portfolios;
+```
+
+After confirming the exact account and portfolio, a one-time manual migration can
+assign a legacy row. Replace both placeholders with IDs you have verified:
+
+```sql
+UPDATE portfolios SET owner_id = <user_id>
+WHERE id = <portfolio_id> AND owner_id IS NULL;
+```
+
+Check the affected row count and ownership afterward. Do not assign all legacy
+portfolios automatically. The nullable column supports this transition; API
+creation always supplies a non-null owner. There is no ownership-transfer API.
+
+Before committing, use separate Postman cookie jars/sessions for two registered
+users. Create a portfolio as A; confirm A can read it and B gets 404 for the
+portfolio and every nested route. Attempt transaction POST and allocation PUT as
+B with valid CSRF tokens: expect 404 and no database changes. Existing business
+rules should still hold for A. Unauthenticated GET must return 401.

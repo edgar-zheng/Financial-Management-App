@@ -10,26 +10,24 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import com.edgar.portfolio.dto.TargetAllocationDto;
 import com.edgar.portfolio.entity.TargetAllocation;
-import com.edgar.portfolio.repository.PortfolioRepository;
 import com.edgar.portfolio.repository.TargetAllocationRepository;
 
 @Service
 public class AllocationService {
-	private final PortfolioRepository portfolios;
+	private final PortfolioAccessService access;
 	private final TargetAllocationRepository targets;
-	public AllocationService(PortfolioRepository portfolios, TargetAllocationRepository targets) {
-		this.portfolios = portfolios; this.targets = targets;
+	public AllocationService(PortfolioAccessService access, TargetAllocationRepository targets) {
+		this.access = access; this.targets = targets;
 	}
 	@Transactional(readOnly = true)
 	public List<TargetAllocationDto> getTargets(Long id) {
-		if (!portfolios.existsById(id)) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Portfolio not found");
+		access.requireOwned(id);
 		return targets.findByPortfolioIdOrderBySymbolAsc(id).stream()
 				.map(target -> new TargetAllocationDto(target.getSymbol(), target.getTargetPercent())).toList();
 	}
 	@Transactional
 	public List<TargetAllocationDto> saveTargets(Long id, List<TargetAllocationDto> requested) {
-		var portfolio = portfolios.findByIdForUpdate(id)
-				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Portfolio not found"));
+		var portfolio = access.requireOwnedForUpdate(id);
 		var normalized = new TreeMap<String, BigDecimal>();
 		BigDecimal total = BigDecimal.ZERO;
 		for (var target : requested) {

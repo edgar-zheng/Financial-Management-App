@@ -24,7 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @Transactional
-class HoldingEndpointTests {
+class HoldingEndpointTests extends OwnedPortfolioTestSupport {
 
 	@Autowired private HoldingController controller;
 	@Autowired private HoldingService service;
@@ -37,7 +37,7 @@ class HoldingEndpointTests {
 	void setUp() {
 		mvc = MockMvcBuilders.standaloneSetup(controller)
 				.setControllerAdvice(new com.edgar.portfolio.exception.GlobalExceptionHandler()).build();
-		portfolio = portfolios.saveAndFlush(new Portfolio("Holdings test"));
+		portfolio = portfolios.saveAndFlush(new Portfolio("Holdings test", owner));
 	}
 
 	private void add(Portfolio owner, String symbol, TransactionType type, String quantity) {
@@ -51,7 +51,7 @@ class HoldingEndpointTests {
 		add(portfolio, "AAPL", TransactionType.BUY, "10");
 		add(portfolio, " aapl ", TransactionType.BUY, "5");
 		add(portfolio, "AAPL", TransactionType.SELL, "3");
-		Portfolio other = portfolios.saveAndFlush(new Portfolio("Other holdings"));
+		Portfolio other = portfolios.saveAndFlush(new Portfolio("Other holdings", owner));
 		add(other, "AAPL", TransactionType.BUY, "100");
 		mvc.perform(get("/api/portfolios/{id}/holdings", portfolio.getId()))
 				.andExpect(status().isOk())

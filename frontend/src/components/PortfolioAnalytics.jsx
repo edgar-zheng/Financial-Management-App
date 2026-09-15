@@ -1,3 +1,4 @@
+import { apiFetch } from '../api.js'
 import { useEffect, useState } from 'react'
 
 const money = value => Number(value).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
@@ -9,7 +10,7 @@ export default function PortfolioAnalytics({ portfolioId }) {
     const controller = new AbortController()
     async function load() {
       try {
-        const response = await fetch(`/api/portfolios/${portfolioId}/analytics`, { signal: controller.signal })
+        const response = await apiFetch(`/api/portfolios/${portfolioId}/analytics`, { signal: controller.signal })
         if (!response.ok) {
           const body = await response.json().catch(() => null)
           throw new Error(body?.message || 'Unable to load analytics.')

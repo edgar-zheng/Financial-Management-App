@@ -1,18 +1,25 @@
+import { apiFetch } from './api.js'
+import SessionGate from './components/SessionGate.jsx'
 import { useEffect, useState } from 'react'
 import PortfolioActivity from './components/PortfolioActivity.jsx'
 
 export default function App() {
+  return <SessionGate><PortfolioDashboard /></SessionGate>
+}
+
+function PortfolioDashboard() {
   const [name, setName] = useState('')
   const [creating, setCreating] = useState(false)
   const [createdPortfolio, setCreatedPortfolio] = useState(null)
   const [createError, setCreateError] = useState('')
-  const [inputId, setInputId] = useState('1')
-  const [request, setRequest] = useState({ id: '1', revision: 0 })
+  const [inputId, setInputId] = useState('')
+  const [request, setRequest] = useState({ id: '', revision: 0 })
   const [portfolio, setPortfolio] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
+    if (!request.id) return
     const controller = new AbortController()
     setLoading(true)
     setError('')
@@ -20,12 +27,12 @@ export default function App() {
 
     async function loadPortfolio() {
       try {
-        const response = await fetch(`/api/portfolios/${request.id}`, {
+        const response = await apiFetch(`/api/portfolios/${request.id}`, {
           signal: controller.signal,
         })
         if (!response.ok) {
           throw new Error(response.status === 404
-            ? 'Portfolio not found.'
+            ? 'Portfolio not found or not owned by this account.'
             : 'Unable to load portfolio. Please try again.')
         }
         const data = await response.json()
@@ -62,7 +69,7 @@ export default function App() {
     }
     setCreating(true)
     try {
-      const response = await fetch('/api/portfolios', {
+      const response = await apiFetch('/api/portfolios', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: trimmedName }),
@@ -108,6 +115,7 @@ export default function App() {
         )}
       </section>
       <h2>Find a portfolio</h2>
+      <p>Create a portfolio or enter the ID of one owned by your account.</p>
       <form onSubmit={submit}>
         <label htmlFor="portfolio-id">Portfolio ID</label>
         <input id="portfolio-id" type="text" inputMode="numeric" pattern="[1-9][0-9]*"

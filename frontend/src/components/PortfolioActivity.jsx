@@ -1,3 +1,4 @@
+import { apiFetch } from '../api.js'
 import AllocationTargets from './AllocationTargets.jsx'
 import { useEffect, useState } from 'react'
 import TransactionForm from './TransactionForm.jsx'
@@ -25,7 +26,7 @@ export default function PortfolioActivity({ portfolioId }) {
     async function load() {
       try {
         const [transactions, holdings] = await Promise.all(['transactions', 'holdings'].map(async resource => {
-          const response = await fetch(`/api/portfolios/${portfolioId}/${resource}`, { signal: controller.signal })
+          const response = await apiFetch(`/api/portfolios/${portfolioId}/${resource}`, { signal: controller.signal })
           if (!response.ok) throw new Error(`Unable to load ${resource} (${response.status}).`)
           return response.json()
         }))
@@ -36,7 +37,7 @@ export default function PortfolioActivity({ portfolioId }) {
     }
     async function loadValuations() {
       try {
-        const response = await fetch(`/api/portfolios/${portfolioId}/holdings/valuation`, {
+        const response = await apiFetch(`/api/portfolios/${portfolioId}/holdings/valuation`, {
           signal: controller.signal,
         })
         if (!response.ok) {

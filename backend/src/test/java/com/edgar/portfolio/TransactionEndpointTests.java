@@ -20,7 +20,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @Transactional
-class TransactionEndpointTests {
+class TransactionEndpointTests extends OwnedPortfolioTestSupport {
 
 	@Autowired private TransactionController controller;
 	@Autowired private PortfolioRepository portfolios;
@@ -36,7 +36,7 @@ class TransactionEndpointTests {
 	void setUp() {
 		mvc = MockMvcBuilders.standaloneSetup(controller)
 				.setControllerAdvice(new com.edgar.portfolio.exception.GlobalExceptionHandler()).build();
-		portfolioId = portfolios.saveAndFlush(new Portfolio("Endpoint test")).getId();
+		portfolioId = portfolios.saveAndFlush(new Portfolio("Endpoint test", owner)).getId();
 	}
 
 	private String path(Long id) {
@@ -45,7 +45,7 @@ class TransactionEndpointTests {
 
 	@Test
 	void createsAndReadsOnlyThisPortfoliosHistory() throws Exception {
-		Long otherId = portfolios.saveAndFlush(new Portfolio("Other portfolio")).getId();
+		Long otherId = portfolios.saveAndFlush(new Portfolio("Other portfolio", owner)).getId();
 		mvc.perform(post(path(otherId)).contentType(MediaType.APPLICATION_JSON).content(VALID))
 				.andExpect(status().isCreated());
 		mvc.perform(post(path(portfolioId)).contentType(MediaType.APPLICATION_JSON).content(VALID))
@@ -111,7 +111,7 @@ class TransactionEndpointTests {
 
 	@Test
 	void cannotSellSharesOwnedOnlyInAnotherPortfolio() throws Exception {
-		Long other = portfolios.saveAndFlush(new Portfolio("Other")).getId();
+		Long other = portfolios.saveAndFlush(new Portfolio("Other", owner)).getId();
 		mvc.perform(post(path(other)).contentType(MediaType.APPLICATION_JSON).content(VALID))
 				.andExpect(status().isCreated());
 		mvc.perform(post(path(portfolioId)).contentType(MediaType.APPLICATION_JSON)
