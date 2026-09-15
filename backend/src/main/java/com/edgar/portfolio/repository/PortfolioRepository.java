@@ -12,6 +12,8 @@ import com.edgar.portfolio.entity.Portfolio;
 public interface PortfolioRepository extends JpaRepository<Portfolio, Long> {
 
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
-	@Query("select p from Portfolio p where p.id = :id")
-	Optional<Portfolio> findByIdForUpdate(@Param("id") Long id);
+	@Query("select p from Portfolio p where p.id = :id and p.owner.id = :ownerId")
+	Optional<Portfolio> findOwnedByIdForUpdate(@Param("id") Long id, @Param("ownerId") Long ownerId);
+
+	Optional<Portfolio> findByIdAndOwnerId(Long id, Long ownerId);
 }

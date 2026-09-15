@@ -1,3 +1,4 @@
+import { apiFetch } from '../api.js'
 import { useRef, useState } from 'react'
 
 export default function TransactionForm({ portfolioId, onCreated }) {
@@ -28,7 +29,7 @@ export default function TransactionForm({ portfolioId, onCreated }) {
     submitting.current = true
     setSaving(true)
     try {
-      const response = await fetch(`/api/portfolios/${portfolioId}/transactions`, {
+      const response = await apiFetch(`/api/portfolios/${portfolioId}/transactions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ symbol: symbol.trim().toUpperCase(), type, quantity, price }),

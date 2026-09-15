@@ -5,32 +5,28 @@ import java.util.Locale;
 import java.math.BigDecimal;
 import com.edgar.portfolio.entity.TransactionType;
 import com.edgar.portfolio.exception.InsufficientSharesException;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 import com.edgar.portfolio.dto.CreateTransactionRequest;
 import com.edgar.portfolio.dto.TransactionResponse;
 import com.edgar.portfolio.entity.Portfolio;
 import com.edgar.portfolio.entity.Transaction;
-import com.edgar.portfolio.repository.PortfolioRepository;
 import com.edgar.portfolio.repository.TransactionRepository;
 
 @Service
 public class TransactionService {
 
-	private final PortfolioRepository portfolios;
+	private final PortfolioAccessService access;
 	private final TransactionRepository transactions;
 
-	public TransactionService(PortfolioRepository portfolios, TransactionRepository transactions) {
-		this.portfolios = portfolios;
+	public TransactionService(PortfolioAccessService access, TransactionRepository transactions) {
+		this.access = access;
 		this.transactions = transactions;
 	}
 
 	@Transactional
 	public TransactionResponse createTransaction(Long portfolioId, CreateTransactionRequest request) {
-		Portfolio portfolio = portfolios.findByIdForUpdate(portfolioId)
-				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Portfolio not found"));
+		Portfolio portfolio = access.requireOwnedForUpdate(portfolioId);
 		String symbol = request.symbol().strip().toUpperCase(Locale.ROOT);
 		if (request.type() == TransactionType.SELL) {
 			BigDecimal owned = BigDecimal.ZERO;
@@ -57,7 +53,6 @@ public class TransactionService {
 	}
 
 	private Portfolio requirePortfolio(Long id) {
-		return portfolios.findById(id)
-				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Portfolio not found"));
+		return access.requireOwned(id);
 	}
 }

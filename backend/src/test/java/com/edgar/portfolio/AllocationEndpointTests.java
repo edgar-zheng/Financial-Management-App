@@ -15,13 +15,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @Transactional
-class AllocationEndpointTests {
+class AllocationEndpointTests extends OwnedPortfolioTestSupport {
 	@Autowired AllocationController controller;
 	@Autowired PortfolioRepository portfolios;
 	@Test
 	void savesValidatesReplacesAndClearsTargets() throws Exception {
 		var mvc = MockMvcBuilders.standaloneSetup(controller).setControllerAdvice(new GlobalExceptionHandler()).build();
-		Long id = portfolios.saveAndFlush(new Portfolio("Allocation test")).getId();
+		Long id = portfolios.saveAndFlush(new Portfolio("Allocation test", owner)).getId();
 		String path = "/api/portfolios/" + id + "/allocations";
 		String valid = "{\"targets\":[{\"symbol\":\" aapl \",\"targetPercent\":30},{\"symbol\":\"VOO\",\"targetPercent\":70}]}";
 		mvc.perform(put(path).contentType(MediaType.APPLICATION_JSON).content(valid)).andExpect(status().isOk());
