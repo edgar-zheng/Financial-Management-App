@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { apiFetch } from '../api.js'
 
 export default function SessionGate({ children }) {
+  const [showPassword, setShowPassword] = useState(false)
+  const feedback = useRef(null)
+  const passwordInput = useRef(null)
   const [account, setAccount] = useState(null)
   const [checking, setChecking] = useState(true)
   const [registering, setRegistering] = useState(false)
@@ -30,10 +33,23 @@ export default function SessionGate({ children }) {
     return () => { controller.abort(); window.removeEventListener('session-expired', expired) }
   }, [])
 
+  useEffect(() => {
+    if (error) feedback.current?.focus()
+  }, [error])
+
+  function changeMode() {
+    setRegistering(!registering)
+    setError(''); setMessage(''); setPassword(''); setShowPassword(false)
+  }
+
   async function submit(event) {
     event.preventDefault()
     if (busy) return
-    setBusy(true); setError(''); setMessage('')
+    setError(''); setMessage('')
+    if (registering && new TextEncoder().encode(password).length > 72) {
+      setError('Choose a password of at most 72 bytes. Accented characters and emoji can use more than one byte.'); return
+    }
+    setBusy(true)
     try {
       const path = registering ? '/api/auth/register' : '/api/auth/login'
       const response = await apiFetch(path, {
@@ -46,15 +62,15 @@ export default function SessionGate({ children }) {
         const body = await response.json().catch(() => null)
         throw new Error(Object.values(body?.fieldErrors || {}).join('; ') || body?.message || 'Authentication failed.')
       }
-      setPassword('')
+      setPassword(''); setShowPassword(false)
       if (registering) {
-        setRegistering(false); setMessage('Account created. Sign in with your new password.')
+        setRegistering(false); setMessage('Your account is ready. Sign in to create your first portfolio.'); passwordInput.current?.focus()
       } else {
         const me = await apiFetch('/api/auth/me')
         if (!me.ok) throw new Error('Unable to confirm your session. Please sign in again.')
         setAccount(await me.json())
       }
-    } catch (error) { setError(error.message) }
+    } catch (error) { setError(error instanceof TypeError ? 'We couldn’t reach the server. Check your connection and try again.' : error.message) }
     finally { setBusy(false) }
   }
 
@@ -64,31 +80,55 @@ export default function SessionGate({ children }) {
     try {
       const response = await apiFetch('/api/auth/logout', { method: 'POST' })
       if (!response.ok) throw new Error('Logout failed. Please retry.')
-      setAccount(null); setPassword(''); setMessage('Signed out.')
+      setAccount(null); setPassword(''); setShowPassword(false); setRegistering(false); setMessage('You’ve been signed out.')
     } catch (error) { setError(error.message) }
     finally { setBusy(false) }
   }
 
-  if (checking) return <main><p role="status">Checking session…</p></main>
+  if (checking) return <main className="auth-loading"><span className="auth-mark" aria-hidden="true">P</span><p role="status">Checking your session…</p></main>
   if (account) return <>
-    <header className="session-bar"><span>Signed in as {account.email}</span>
-      <button type="button" disabled={busy} onClick={logout}>Sign out</button>
-      {error && <p role="alert">{error}</p>}
+    <header className="account-bar">
+      <div className="account-brand"><span className="auth-mark" aria-hidden="true">P</span><strong>Portfolio Tracker</strong></div>
+      <div className="account-controls"><div><span className="account-caption">Signed in</span><span className="account-email">{account.email}</span></div>
+        <button className="account-signout" type="button" disabled={busy} onClick={logout}>{busy ? 'Signing out…' : 'Sign out'}</button>
+      </div>
+      {error && <p className="auth-feedback auth-error" role="alert" tabIndex={-1} ref={feedback}>{error}</p>}
     </header>
     {children}
   </>
-  return <main>
-    <h1>Portfolio Tracker</h1><h2>{registering ? 'Create an account' : 'Sign in'}</h2>
-    <form onSubmit={submit}><fieldset disabled={busy}>
-      <label>Email<input type="email" required autoComplete="username" value={email} onChange={event => setEmail(event.target.value)} /></label>
-      <label>Password<input type="password" required minLength={registering ? 12 : undefined}
-        autoComplete={registering ? 'new-password' : 'current-password'} value={password} onChange={event => setPassword(event.target.value)} /></label>
-      <button type="submit">{busy ? 'Please wait…' : registering ? 'Create account' : 'Sign in'}</button>
-      <button type="button" onClick={() => { setRegistering(!registering); setError(''); setMessage(''); setPassword('') }}>
-        {registering ? 'Back to sign in' : 'Create an account'}
-      </button>
-    </fieldset></form>
-    {registering && <p>Use at least 12 characters and at most 72 UTF-8 bytes for your password.</p>}
-    {error && <p role="alert">{error}</p>}{message && <p role="status">{message}</p>}
+  return <main className="auth-shell">
+    <aside className="auth-intro">
+      <div className="auth-brand"><span className="auth-mark" aria-hidden="true">P</span><span>Portfolio Tracker</span></div>
+      <div><p className="auth-eyebrow">YOUR INVESTMENTS, IN VIEW</p><h1>A clearer picture<br />of your portfolio.</h1>
+        <p className="auth-description">Track your trades, understand your holdings, and see how your allocations compare with your goals.</p></div>
+      <div className="auth-features"><span>Holdings &amp; performance</span><span>Allocation &amp; drift</span></div>
+    </aside>
+    <section className="auth-panel" aria-labelledby="auth-title">
+      <p className="auth-eyebrow">{registering ? 'GET STARTED' : 'WELCOME BACK'}</p>
+      <h2 id="auth-title">{registering ? 'Create your account' : 'Sign in'}</h2>
+      <p className="auth-subtitle">{registering ? 'Start with an account. Build your portfolio from there.' : 'Your portfolio is right where you left it.'}</p>
+      {message && <p className="auth-feedback auth-success" role="status">{message}</p>}
+      {error && <p id="auth-error" className="auth-feedback auth-error" role="alert" tabIndex={-1} ref={feedback}>{error}</p>}
+      <form className="auth-form" onSubmit={submit} aria-busy={busy}>
+        <fieldset disabled={busy}>
+          <label htmlFor="auth-email">Email address</label>
+          <input id="auth-email" type="email" required maxLength={254} autoComplete="username" autoCapitalize="none" spellCheck={false}
+            placeholder="you@example.com" value={email} onChange={event => setEmail(event.target.value)} />
+          <label htmlFor="auth-password">Password</label>
+          <div className="auth-password">
+            <input id="auth-password" ref={passwordInput} type={showPassword ? 'text' : 'password'} required minLength={registering ? 12 : undefined}
+              aria-describedby={registering ? 'password-help' : undefined}
+              autoComplete={registering ? 'new-password' : 'current-password'} value={password} onChange={event => setPassword(event.target.value)} />
+            <button type="button" className="password-toggle" aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword}
+              onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Hide' : 'Show'}</button>
+          </div>
+          {registering && <p id="password-help" className="auth-help">At least 12 characters, up to 72 UTF-8 bytes. A few memorable words make a good starting point.</p>}
+          <button className="auth-submit" type="submit">{busy ? registering ? 'Creating account…' : 'Signing in…' : registering ? 'Create account' : 'Sign in'}<span aria-hidden="true">→</span></button>
+        </fieldset>
+      </form>
+      <p className="auth-switch">{registering ? 'Already have an account?' : 'New to Portfolio Tracker?'}{' '}
+        <button type="button" disabled={busy} onClick={changeMode}>{registering ? 'Sign in' : 'Create an account'}</button>
+      </p>
+    </section>
   </main>
 }
