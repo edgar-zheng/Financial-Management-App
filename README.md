@@ -209,3 +209,27 @@ users. Create a portfolio as A; confirm A can read it and B gets 404 for the
 portfolio and every nested route. Attempt transaction POST and allocation PUT as
 B with valid CSRF tokens: expect 404 and no database changes. Existing business
 rules should still hold for A. Unauthenticated GET must return 401.
+
+## Focused service and controller tests
+
+JUnit and Mockito are already supplied by the existing test dependencies. Run the
+new isolated tests without starting MySQL or using a market API credential:
+
+```sh
+./mvnw -f backend/pom.xml -Dtest=RegistrationServiceTests,PortfolioAccessServiceTests,TransactionServiceTests,AuthControllerTests,PortfolioAnalyticsControllerTests test
+```
+
+These tests mock repository/service boundaries and use standalone MockMvc for
+request validation, serialization, and exception translation. They do not prove
+security-filter behavior or database constraints; the existing security,
+ownership, and persistence integration tests cover those through the full suite:
+
+```sh
+./mvnw -f backend/pom.xml test
+```
+
+The full suite requires the configured local MySQL database. Integration fixtures
+are rolled back, but Hibernate's schema-update setting can still update tables.
+Results are written to `backend/target/surefire-reports/`. Never use a production
+database for tests. Market-provider responses remain mocked. Flyway migrations
+are a separate future step; no schema migration was added in this testing change.

@@ -1,1 +1,1 @@
-SHOW CREATE TABLE users;
+

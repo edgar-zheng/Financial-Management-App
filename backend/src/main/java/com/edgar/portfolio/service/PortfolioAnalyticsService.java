@@ -7,9 +7,8 @@ import java.util.ArrayList;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
+import com.edgar.portfolio.exception.PortfolioStateConflictException;
 import com.edgar.portfolio.dto.AssetAllocationDto;
 import com.edgar.portfolio.dto.PortfolioSummaryDto;
 import com.edgar.portfolio.entity.TransactionType;
@@ -37,7 +36,7 @@ public class PortfolioAnalyticsService {
 				position.cost = position.cost.add(amount);
 			} else {
 				if (quantity.compareTo(position.quantity) > 0) {
-					throw new ResponseStatusException(HttpStatus.CONFLICT, "Transaction history sells more shares than owned for " + symbol);
+					throw new PortfolioStateConflictException("Transaction history sells more shares than owned for " + symbol);
 				}
 				// Moving weighted-average cost; full liquidation removes all residual cost.
 				BigDecimal removedCost = quantity.compareTo(position.quantity) == 0 ? position.cost
@@ -58,7 +57,7 @@ public class PortfolioAnalyticsService {
 		for (var holding : holdings) {
 			Position position = positions.get(holding.symbol());
 			if (position == null || position.quantity.compareTo(holding.quantity()) != 0) {
-				throw new ResponseStatusException(HttpStatus.CONFLICT, "Portfolio changed while calculating analytics. Refresh to retry.");
+				throw new PortfolioStateConflictException("Portfolio changed while calculating analytics. Refresh to retry.");
 			}
 			cost = cost.add(position.cost);
 			BigDecimal weight = total.signum() == 0 ? BigDecimal.ZERO
@@ -68,7 +67,7 @@ public class PortfolioAnalyticsService {
 		}
 		long openPositions = positions.values().stream().filter(position -> position.quantity.signum() != 0).count();
 		if (openPositions != holdings.size()) {
-			throw new ResponseStatusException(HttpStatus.CONFLICT, "Portfolio changed while calculating analytics. Refresh to retry.");
+			throw new PortfolioStateConflictException("Portfolio changed while calculating analytics. Refresh to retry.");
 		}
 		BigDecimal unrealized = total.subtract(cost);
 		return new PortfolioSummaryDto(portfolioId, "USD", "PREVIOUS_CLOSE", total, cost,

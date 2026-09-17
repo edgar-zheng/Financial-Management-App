@@ -4,8 +4,7 @@ import java.time.LocalDateTime;
 import com.edgar.portfolio.service.PortfolioAccessService;
 import com.edgar.portfolio.entity.User;
 import com.edgar.portfolio.exception.GlobalExceptionHandler;
-import org.springframework.web.server.ResponseStatusException;
-import org.springframework.http.HttpStatus;
+import com.edgar.portfolio.exception.PortfolioNotFoundException;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -90,10 +89,35 @@ class PortfolioControllerTests {
 
 	@Test
 	void returnsNotFoundForMissingPortfolio() throws Exception {
-		when(access.requireOwned(999L)).thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Portfolio not found"));
+		when(access.requireOwned(999L)).thenThrow(new PortfolioNotFoundException());
 
 		mvc.perform(get("/api/portfolios/999"))
 				.andExpect(status().isNotFound());
 		verify(access).requireOwned(999L);
 	}
+
+    @Test void rejectsOverlongNameBeforePersistence() throws Exception {
+        mvc.perform(post("/api/portfolios").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"" + "a".repeat(256) + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.name").exists());
+        verifyNoInteractions(repository);
+    }
+
+    @Test void hidesUnexpectedPersistenceFailure() throws Exception {
+        when(repository.save(any(Portfolio.class))).thenThrow(
+                new org.springframework.dao.DataIntegrityViolationException("private SQL details"));
+        mvc.perform(post("/api/portfolios").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Retirement\"}"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.message").value("An unexpected error occurred"))
+                .andExpect(jsonPath("$.fieldErrors").isMap());
+    }
+
+    @Test void preservesUnsupportedMethodStatus() throws Exception {
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/portfolios/1"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.status").value(405));
+    }
 }

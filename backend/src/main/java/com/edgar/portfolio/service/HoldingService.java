@@ -28,8 +28,19 @@ public class HoldingService {
 	public List<HoldingDto> getHoldings(Long portfolioId) {
 		access.requireOwned(portfolioId);
 
+		Map<String, BigDecimal> quantities = aggregateQuantities(
+				transactions.findByPortfolioIdOrderByTimestampAscIdAsc(portfolioId));
+
+		return quantities.entrySet().stream()
+				.filter(entry -> entry.getValue().signum() != 0)
+				.map(entry -> new HoldingDto(entry.getKey(), entry.getValue()))
+				.toList();
+	}
+
+	// Shared by holdings reads and sale validation within the caller's transaction.
+	static Map<String, BigDecimal> aggregateQuantities(List<Transaction> history) {
 		Map<String, BigDecimal> quantities = new TreeMap<>();
-		for (Transaction transaction : transactions.findByPortfolioIdOrderByTimestampAscIdAsc(portfolioId)) {
+		for (Transaction transaction : history) {
 			String symbol = transaction.getSymbol().strip().toUpperCase(Locale.ROOT);
 			BigDecimal quantity = switch (transaction.getType()) {
 				case BUY -> transaction.getQuantity();
@@ -43,9 +54,6 @@ public class HoldingService {
 			}
 		}
 
-		return quantities.entrySet().stream()
-				.filter(entry -> entry.getValue().signum() != 0)
-				.map(entry -> new HoldingDto(entry.getKey(), entry.getValue()))
-				.toList();
+		return quantities;
 	}
 }

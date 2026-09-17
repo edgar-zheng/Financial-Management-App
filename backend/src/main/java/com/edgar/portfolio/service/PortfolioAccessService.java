@@ -6,6 +6,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import com.edgar.portfolio.entity.Portfolio;
+import com.edgar.portfolio.exception.PortfolioNotFoundException;
 import com.edgar.portfolio.entity.User;
 import com.edgar.portfolio.repository.PortfolioRepository;
 import com.edgar.portfolio.repository.UserRepository;
@@ -27,11 +28,11 @@ public class PortfolioAccessService {
 	}
 	public Portfolio requireOwned(Long id) {
 		return portfolios.findByIdAndOwnerId(id, currentUser().getId())
-				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Portfolio not found"));
+				.orElseThrow(PortfolioNotFoundException::new);
 	}
 	// Caller must have an active transaction so the write lock lasts through the mutation.
 	public Portfolio requireOwnedForUpdate(Long id) {
 		return portfolios.findOwnedByIdForUpdate(id, currentUser().getId())
-				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Portfolio not found"));
+				.orElseThrow(PortfolioNotFoundException::new);
 	}
 }

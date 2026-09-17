@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.edgar.portfolio.dto.CreatePortfolioRequest;
-import com.edgar.portfolio.entity.Portfolio;
+import com.edgar.portfolio.dto.PortfolioResponse;
 import com.edgar.portfolio.service.PortfolioService;
 
 import jakarta.validation.Valid;
@@ -26,15 +26,13 @@ public class PortfolioController {
 	}
 
 	@PostMapping
-	public ResponseEntity<Portfolio> createPortfolio(@Valid @RequestBody CreatePortfolioRequest request) {
-		Portfolio portfolio = portfolioService.createPortfolio(request.name());
+	public ResponseEntity<PortfolioResponse> createPortfolio(@Valid @RequestBody CreatePortfolioRequest request) {
+		PortfolioResponse portfolio = portfolioService.createPortfolio(request.name());
 		return ResponseEntity.status(HttpStatus.CREATED).body(portfolio);
 	}
 
 	@GetMapping("/{id}")
-	public ResponseEntity<Portfolio> getPortfolioById(@PathVariable("id") Long id) {
-		return ResponseEntity.ok(portfolioService.getPortfolioById(id)
-				.orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
-						HttpStatus.NOT_FOUND, "Portfolio not found")));
+	public ResponseEntity<PortfolioResponse> getPortfolioById(@PathVariable("id") Long id) {
+		return ResponseEntity.ok(portfolioService.getPortfolioById(id));
 	}
 }
