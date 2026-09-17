@@ -1,6 +1,7 @@
 package com.edgar.portfolio.service;
 
 import org.junit.jupiter.api.Test;
+import com.edgar.portfolio.exception.RegistrationConflictException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
@@ -33,9 +34,16 @@ class RegistrationServiceTests {
 	@Test
 	void convertsUniqueConstraintFailureToConflictWithoutLeakingDatabaseDetails() {
 		when(encoder.encode(anyString())).thenReturn("encoded");
-		when(users.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("sensitive database details"));
-		var error = assertThrows(ResponseStatusException.class, () -> service.register("a@example.com", "long-test-password"));
-		assertEquals(409, error.getStatusCode().value());
-		assertFalse(error.getReason().contains("sensitive"));
+		when(users.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("sensitive database details", new java.sql.SQLException("duplicate", "23000", 1062)));
+		var error = assertThrows(RegistrationConflictException.class, () -> service.register("a@example.com", "long-test-password"));
+		assertFalse(error.getMessage().contains("sensitive"));
 	}
+
+    @Test void doesNotMisclassifyUnknownIntegrityFailuresAsDuplicateEmail() {
+        when(encoder.encode(anyString())).thenReturn("encoded");
+        var failure = new DataIntegrityViolationException("unknown constraint");
+        when(users.saveAndFlush(any())).thenThrow(failure);
+        assertSame(failure, assertThrows(DataIntegrityViolationException.class,
+                () -> service.register("a@example.com", "long-test-password")));
+    }
 }

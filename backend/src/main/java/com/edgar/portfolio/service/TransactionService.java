@@ -16,6 +16,8 @@ import com.edgar.portfolio.repository.TransactionRepository;
 @Service
 public class TransactionService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TransactionService.class);
+
 	private final PortfolioAccessService access;
 	private final TransactionRepository transactions;
 
@@ -29,14 +31,13 @@ public class TransactionService {
 		Portfolio portfolio = access.requireOwnedForUpdate(portfolioId);
 		String symbol = request.symbol().strip().toUpperCase(Locale.ROOT);
 		if (request.type() == TransactionType.SELL) {
-			BigDecimal owned = BigDecimal.ZERO;
-			for (Transaction previous : transactions.findByPortfolioIdOrderByTimestampAscIdAsc(portfolioId)) {
-				if (previous.getSymbol().strip().toUpperCase(Locale.ROOT).equals(symbol)) {
-					owned = owned.add(previous.getType() == TransactionType.BUY
-							? previous.getQuantity() : previous.getQuantity().negate());
-				}
-			}
+			BigDecimal owned = HoldingService.aggregateQuantities(
+                    transactions.findByPortfolioIdOrderByTimestampAscIdAsc(portfolioId))
+                    .getOrDefault(symbol, BigDecimal.ZERO);
 			if (request.quantity().compareTo(owned) > 0) {
+				log.warn(
+                        "Rejected sell portfolioId={} symbol={} requested={} available={}",
+                        portfolioId, symbol, request.quantity(), owned);
 				throw new InsufficientSharesException(symbol);
 			}
 		}
@@ -47,12 +48,9 @@ public class TransactionService {
 
 	@Transactional(readOnly = true)
 	public List<TransactionResponse> getTransactions(Long portfolioId) {
-		requirePortfolio(portfolioId);
+		access.requireOwned(portfolioId);
 		return transactions.findByPortfolioIdOrderByTimestampAscIdAsc(portfolioId).stream()
 				.map(TransactionResponse::from).toList();
 	}
 
-	private Portfolio requirePortfolio(Long id) {
-		return access.requireOwned(id);
-	}
 }

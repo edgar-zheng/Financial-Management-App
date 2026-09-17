@@ -3,8 +3,7 @@ package com.edgar.portfolio.service;
 import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
+import com.edgar.portfolio.exception.PortfolioNotFoundException;
 import com.edgar.portfolio.dto.CreateTransactionRequest;
 import com.edgar.portfolio.entity.Portfolio;
 import com.edgar.portfolio.entity.Transaction;
@@ -41,11 +40,22 @@ class TransactionServiceTests {
 		verify(repository).save(any());
 	}
 	@Test void checksOwnershipBeforeReadingOrWritingTransactions() {
-		when(access.requireOwned(2L)).thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND));
-		when(access.requireOwnedForUpdate(2L)).thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND));
-		assertThrows(ResponseStatusException.class, () -> service.getTransactions(2L));
-		assertThrows(ResponseStatusException.class, () -> service.createTransaction(2L,
+		when(access.requireOwned(2L)).thenThrow(new PortfolioNotFoundException());
+		when(access.requireOwnedForUpdate(2L)).thenThrow(new PortfolioNotFoundException());
+		assertThrows(PortfolioNotFoundException.class, () -> service.getTransactions(2L));
+		assertThrows(PortfolioNotFoundException.class, () -> service.createTransaction(2L,
 				new CreateTransactionRequest("AAPL", TransactionType.BUY, BigDecimal.ONE, BigDecimal.TEN)));
 		verifyNoInteractions(repository);
 	}
+
+    @Test void validBuyDoesNotNeedHistoryAndReturnsSavedTransaction() {
+        when(access.requireOwnedForUpdate(1L)).thenReturn(portfolio);
+        when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        var result = service.createTransaction(1L,
+                new CreateTransactionRequest(" aapl ", TransactionType.BUY, BigDecimal.ONE, BigDecimal.TEN));
+        assertEquals("AAPL", result.symbol());
+        assertEquals(TransactionType.BUY, result.type());
+        assertEquals(BigDecimal.ONE, result.quantity());
+        verify(repository, never()).findByPortfolioIdOrderByTimestampAscIdAsc(anyLong());
+    }
 }

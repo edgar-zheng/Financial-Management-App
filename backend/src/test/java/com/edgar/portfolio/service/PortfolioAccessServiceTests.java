@@ -1,6 +1,7 @@
 package com.edgar.portfolio.service;
 
 import java.util.Optional;
+import com.edgar.portfolio.exception.PortfolioNotFoundException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -48,8 +49,8 @@ class PortfolioAccessServiceTests {
 	}
 	@Test void hidesOtherUsersAndMissingPortfoliosWith404() {
 		authenticate();
-		assertEquals(404, assertThrows(ResponseStatusException.class, () -> service.requireOwned(99L)).getStatusCode().value());
-		assertEquals(404, assertThrows(ResponseStatusException.class, () -> service.requireOwnedForUpdate(99L)).getStatusCode().value());
+		assertThrows(PortfolioNotFoundException.class, () -> service.requireOwned(99L));
+		assertThrows(PortfolioNotFoundException.class, () -> service.requireOwnedForUpdate(99L));
 	}
 	@Test void rejectsSessionForUserNoLongerInDatabase() {
 		authenticate();

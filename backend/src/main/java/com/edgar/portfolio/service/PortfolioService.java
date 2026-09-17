@@ -1,6 +1,7 @@
 package com.edgar.portfolio.service;
 
-import java.util.Optional;
+import org.springframework.transaction.annotation.Transactional;
+import com.edgar.portfolio.dto.PortfolioResponse;
 
 import org.springframework.stereotype.Service;
 
@@ -18,11 +19,13 @@ public class PortfolioService {
 		this.access = access;
 	}
 
-	public Portfolio createPortfolio(String name) {
-		return portfolioRepository.save(new Portfolio(name, access.currentUser()));
+	@Transactional
+	public PortfolioResponse createPortfolio(String name) {
+		return PortfolioResponse.from(portfolioRepository.save(new Portfolio(name, access.currentUser())));
 	}
 
-	public Optional<Portfolio> getPortfolioById(Long id) {
-		return Optional.of(access.requireOwned(id));
+	@Transactional(readOnly = true)
+	public PortfolioResponse getPortfolioById(Long id) {
+		return PortfolioResponse.from(access.requireOwned(id));
 	}
 }

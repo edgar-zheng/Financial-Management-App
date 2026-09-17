@@ -1,6 +1,8 @@
 package com.edgar.portfolio.service;
 
 import java.nio.charset.StandardCharsets;
+import java.sql.SQLException;
+import com.edgar.portfolio.exception.RegistrationConflictException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -25,7 +27,14 @@ public class RegistrationService {
 		try {
 			users.saveAndFlush(new User(email, encoder.encode(password)));
 		} catch (DataIntegrityViolationException exception) {
-			throw new ResponseStatusException(HttpStatus.CONFLICT, "Unable to register this email");
+			// MySQL duplicate-key violations are the known email uniqueness conflict.
+            // Other integrity failures must reach the generic, logged 500 handler.
+            for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+                if (cause instanceof SQLException sql && sql.getErrorCode() == 1062) {
+                    throw new RegistrationConflictException();
+                }
+            }
+            throw exception;
 		}
 	}
 }
