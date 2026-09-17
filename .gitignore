@@ -42,3 +42,7 @@ src/main/resources/application-env.properties
 
 # Local backend credentials after backend relocation
 backend/src/main/resources/application-env.properties
+
+# Local browser test artifacts
+frontend/test-results/
+frontend/playwright-report/

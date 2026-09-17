@@ -1,7 +1,7 @@
 import { apiFetch } from '../api.js'
 import { useRef, useState } from 'react'
 
-export default function TransactionForm({ portfolioId, onCreated }) {
+export default function TransactionForm({ portfolioId, onCreated, refreshing }) {
   const [symbol, setSymbol] = useState('')
   const [type, setType] = useState('BUY')
   const [quantity, setQuantity] = useState('')
@@ -37,7 +37,9 @@ export default function TransactionForm({ portfolioId, onCreated }) {
       if (!response.ok) {
         const body = await response.json().catch(() => null)
         const fields = Object.entries(body?.fieldErrors || {}).map(([key, value]) => `${key}: ${value}`)
-        throw new Error(fields.join('; ') || body?.message || `Unable to save transaction (${response.status}).`)
+        throw new Error(response.status === 409 ? 'This sale exceeds your available shares. Check Holdings and reduce the quantity.'
+          : response.status === 400 ? fields.join('; ') || 'Check the ticker, quantity and price.'
+          : response.status === 404 ? 'This portfolio is no longer available.' : 'Unable to save the transaction. Please try again.')
       }
       setQuantity('')
       setPrice('')
@@ -56,17 +58,20 @@ export default function TransactionForm({ portfolioId, onCreated }) {
   return (
     <section aria-labelledby="transaction-heading">
       <h3 id="transaction-heading">Add transaction</h3>
-      <form onSubmit={submit}>
-        <fieldset disabled={saving}>
+      <p className="muted">Record a trade to keep your portfolio up to date.</p>
+      <form className="workspace-form" onSubmit={submit} aria-busy={saving}>
+        <fieldset disabled={saving || refreshing}>
           <label>Symbol<input required maxLength={32} value={symbol} onChange={event => setSymbol(event.target.value)} placeholder="AAPL" /></label>
-          <label>Type<select value={type} onChange={event => setType(event.target.value)}><option>BUY</option><option>SELL</option></select></label>
+          <div className="segmented trade-type" role="group" aria-label="Transaction type">
+            {['BUY', 'SELL'].map(value => <button type="button" key={value} aria-pressed={type === value} onClick={() => setType(value)}>{value}</button>)}
+          </div>
           <label>Quantity<input required inputMode="decimal" value={quantity} onChange={event => setQuantity(event.target.value)} placeholder="10" /></label>
           <label>Price<input required inputMode="decimal" value={price} onChange={event => setPrice(event.target.value)} placeholder="245.30" /></label>
-          <button type="submit">{saving ? 'Saving…' : 'Add transaction'}</button>
+          <button className="primary" type="submit">{saving ? 'Saving…' : 'Add transaction'}</button>
         </fieldset>
       </form>
-      {error && <p role="alert">{error}</p>}
-      {message && <p role="status">{message}</p>}
+      {error && <p className="auth-feedback auth-error" role="alert">{error}</p>}
+      {message && <p className="auth-feedback auth-success" role="status">{message}</p>}
     </section>
   )
 }
