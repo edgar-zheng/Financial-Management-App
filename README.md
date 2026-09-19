@@ -5,6 +5,56 @@ Spring Boot backend and React frontend in one repository. The backend is in `bac
 
 ## Run locally
 
+### Full application with Docker Compose
+
+Docker Desktop (or Docker Engine with Compose v2) is sufficient; Homebrew MySQL,
+host Java, and host Node are not required. MySQL 26.7.0 matches the inspected
+local installation. Its data lives in the `portfolio_mysql_data` named volume.
+
+For a new checkout, copy `.env.example` to `.env.docker` and fill in the values:
+`MYSQL_DATABASE=portfolio_tracker`, `MYSQL_USER=portfolio_app`, two distinct
+database passwords, your `MARKET_API_KEY`, and optionally `FRONTEND_PORT=8081`.
+The example contains names only. `.env.docker` and `.env` are ignored by Git.
+Keep the existing Spring-style `.env` separate; do not overwrite it.
+If `.env.docker` already exists, use it rather than copying over it.
+
+```sh
+docker compose --env-file .env.docker config --quiet
+docker compose --env-file .env.docker build
+docker compose --env-file .env.docker up -d --wait
+docker compose --env-file .env.docker ps
+```
+
+Open http://localhost:8081 (or the `FRONTEND_PORT` in your env file). The local
+verification setup uses port 8082 because 8081 was already occupied. Register an
+account, then sign in. The database starts
+empty; existing Homebrew data is not imported. Nginx proxies browser `/api`
+requests to `backend:8080`, preserving session cookies and CSRF. Backend JDBC
+uses `db:3306`. Neither database nor backend publishes a host port. Flyway applies
+V1–V4 to the new database, and Hibernate validates the resulting schema.
+Database readiness gates backend startup; the frontend healthcheck verifies
+that the proxied backend CSRF endpoint responds before `up --wait` succeeds.
+The market key is optional for startup but needed for populated valuations and
+analytics. Authentication uses sessions, so there is no JWT signing secret.
+
+```sh
+# Logs
+docker compose --env-file .env.docker logs --tail=100 backend
+# Restart services (sign in again if the backend session was lost)
+docker compose --env-file .env.docker restart
+# Stop and remove containers, preserving database contents
+docker compose --env-file .env.docker down
+# Recreate containers with the same persisted database
+docker compose --env-file .env.docker up -d --wait
+```
+
+Do not add `--volumes`/`-v` to `down` unless deliberately deleting the database.
+Database initialization environment variables apply on the first startup of an
+empty volume; editing passwords in the env file does not change existing MySQL
+accounts. Do not disable Flyway or automatically baseline this new database.
+
+### Without Docker
+
 Prerequisites: Java 21, local MySQL with the `portfolio_tracker` database, and a
 current Node.js LTS version supported by Vite (Node 22.12+ or newer).
 
