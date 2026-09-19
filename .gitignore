@@ -12,6 +12,8 @@ backend/src/main/resources/application-env.properties
 .settings
 .springBeans
 .sts4-cache
+.DS_Store
+
 
 ### IntelliJ IDEA ###
 .idea
