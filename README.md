@@ -5,6 +5,88 @@ Spring Boot backend and React frontend in one repository. The backend is in `bac
 
 ## Run locally
 
+### Full application with Docker Compose
+
+Docker Desktop (or Docker Engine with Compose v2) is sufficient; Homebrew MySQL,
+host Java, and host Node are not required. MySQL 26.7.0 matches the inspected
+local installation. Its data lives in the `portfolio_mysql_data` named volume.
+
+For a new checkout, copy `.env.example` to `.env.docker` and fill in the values:
+`MYSQL_DATABASE=portfolio_tracker`, `MYSQL_USER=portfolio_app`, two distinct
+database passwords, your `MARKET_API_KEY`, and optionally `FRONTEND_PORT=8081`.
+The example contains names only. `.env.docker` and `.env` are ignored by Git.
+Keep the existing Spring-style `.env` separate; do not overwrite it.
+If `.env.docker` already exists, use it rather than copying over it.
+
+```sh
+docker compose --env-file .env.docker config --quiet
+docker compose --env-file .env.docker build
+docker compose --env-file .env.docker up -d --wait
+docker compose --env-file .env.docker ps
+```
+
+Open http://localhost:8081 (or the `FRONTEND_PORT` in your env file). The local
+verification setup uses port 8082 because 8081 was already occupied. Register an
+account, then sign in. The database starts
+empty; existing Homebrew data is not imported. Nginx proxies browser `/api`
+requests to `backend:8080`, preserving session cookies and CSRF. Backend JDBC
+uses `db:3306`. Neither database nor backend publishes a host port. Flyway applies
+V1–V4 to the new database, and Hibernate validates the resulting schema.
+Database readiness gates backend startup, and backend health gates frontend
+startup. The frontend healthcheck verifies
+that the proxied backend CSRF endpoint responds before `up --wait` succeeds.
+The market key is optional for startup but needed for populated valuations and
+analytics. Authentication uses sessions, so there is no JWT signing secret.
+
+The Compose backend activates `prod`: required datasource environment values,
+SQL logging disabled, HttpOnly/SameSite=Lax session cookies, and secure cookies
+by default. Local HTTP Compose explicitly sets `SESSION_COOKIE_SECURE=false`.
+For HTTPS deployment retain secure cookies and configure trusted proxy handling
+for the selected ingress; this local Compose file is not a public TLS setup.
+Local configuration imports are disabled in Compose.
+
+Backend and frontend run as non-root with read-only root filesystems, writable
+temporary directories, all capabilities dropped, and no privilege escalation.
+MySQL uses its official initialization entrypoint, then runs the server as the
+mysql user; its volume remains writable. Nginx listens on container port 8080.
+All services log to stdout/stderr with Docker log rotation (three 10 MB files).
+Backend/frontend health probes check HTTP availability; the database probe runs
+a real SQL query. These probes are not comprehensive business-health checks.
+
+Before public deployment, configure TLS and trusted proxy handling, database
+backups, and platform-managed secret injection. Environment variables are suitable
+for this local stack but remain visible to administrators with Docker access.
+Sessions are held in one backend process; restarts require login again, and
+multiple replicas need a shared session strategy. Release builds should pin
+base-image digests, scan vulnerabilities, and target the deployment CPU
+architecture; the locally verified images are Linux ARM64. No cloud resources
+are created by this setup.
+
+```sh
+# Logs
+docker compose --env-file .env.docker logs --tail=100 backend
+# Restart services (sign in again if the backend session was lost)
+docker compose --env-file .env.docker restart
+# Stop and remove containers, preserving database contents
+docker compose --env-file .env.docker down
+# Recreate containers with the same persisted database
+docker compose --env-file .env.docker up -d --wait
+```
+
+To deliberately reset the database (deletes all Compose accounts and portfolios):
+
+```sh
+docker compose --env-file .env.docker down --volumes
+docker compose --env-file .env.docker up -d --wait
+```
+
+Do not add `--volumes`/`-v` to `down` unless deliberately deleting the database.
+Database initialization environment variables apply on the first startup of an
+empty volume; editing passwords in the env file does not change existing MySQL
+accounts. Do not disable Flyway or automatically baseline this new database.
+
+### Without Docker
+
 Prerequisites: Java 21, local MySQL with the `portfolio_tracker` database, and a
 current Node.js LTS version supported by Vite (Node 22.12+ or newer).
 
@@ -229,7 +311,6 @@ ownership, and persistence integration tests cover those through the full suite:
 ```
 
 The full suite requires the configured local MySQL database. Integration fixtures
-are rolled back, but Hibernate's schema-update setting can still update tables.
+are rolled back, but Flyway startup can apply pending migrations.
 Results are written to `backend/target/surefire-reports/`. Never use a production
-database for tests. Market-provider responses remain mocked. Flyway migrations
-are a separate future step; no schema migration was added in this testing change.
+database for tests. Market-provider responses remain mocked. Flyway owns schema evolution; Hibernate validates the resulting schema.

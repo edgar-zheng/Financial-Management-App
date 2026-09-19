@@ -1,5 +1,32 @@
 # Frontend workflow and verification
 
+## Production Docker image
+
+From the repository root:
+
+```sh
+docker build -t portfolio-frontend:local frontend
+docker run --rm --name portfolio-frontend -p 8081:8080 \
+  -e BACKEND_URL=http://host.docker.internal:8080 portfolio-frontend:local
+```
+
+Open http://localhost:8081. This example reaches a backend running on the host
+through Docker Desktop. On Linux Docker Engine, add
+`--add-host=host.docker.internal:host-gateway` to the run command. For a backend
+container on a shared Docker network, pass `--network <network>` and set
+`BACKEND_URL=http://<backend-container-name>:8080` instead.
+
+`BACKEND_URL` is required and must be an origin with no trailing slash or path.
+Nginx substitutes it at container startup; changing it requires recreating the
+container, not rebuilding the JavaScript. Browser requests stay on relative
+`/api` URLs, preserving session cookies and CSRF behavior. The production server
+is unprivileged nginx on container port 8080, not Vite. Unknown client routes return `index.html`; API responses and
+missing built assets do not use the SPA fallback.
+
+The build context is `frontend/`, with an allowlist in `.dockerignore`; local
+`.env` files, secrets, tests, dependencies, and build output are excluded.
+The final image contains nginx and the built static assets, without Node/npm.
+
 The React/Vite application uses plain CSS, local component state, and the existing session-cookie/CSRF API helper. Authentication retains its forest-green visual theme. After login, select or create a portfolio, then continue into its dashboard. Use **Switch portfolio** to return to selection; this does not sign out.
 
 ## Run and test
