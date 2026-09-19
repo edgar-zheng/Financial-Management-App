@@ -1,0 +1,25 @@
+# Only production build inputs enter the context.
+**
+!package.json
+!package-lock.json
+!index.html
+!vite.config.js
+!nginx.conf.template
+!src/
+!src/**
+
+**/.env
+**/.env.*
+**/*.test.*
+**/*.spec.*
+**/secrets
+**/application-secrets.*
+**/*.pem
+**/*.key
+**/.git
+**/.idea
+**/.vscode
+**/.DS_Store
+**/node_modules
+**/dist
+**/*.log
