@@ -1,13 +1,17 @@
 server {
-    listen 80;
+    listen 8080;
     server_name _;
     root /usr/share/nginx/html;
     index index.html;
+    server_tokens off;
+    # Docker DNS: refresh upstream addresses after backend container recreation.
+    resolver 127.0.0.11 valid=10s ipv6=off;
 
     # BACKEND_URL is a required runtime origin, without a trailing slash/path.
-    # No URI suffix on proxy_pass: preserve /api and the query string.
+    # Preserve the original /api path and query string when resolving dynamically.
     location ~ ^/api(?:/|$) {
-        proxy_pass ${BACKEND_URL};
+        set $backend_origin ${BACKEND_URL};
+        proxy_pass $backend_origin$request_uri;
         proxy_http_version 1.1;
         proxy_set_header Host $http_host;
         proxy_set_header X-Real-IP $remote_addr;

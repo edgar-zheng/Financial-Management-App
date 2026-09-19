@@ -8,9 +8,9 @@ COPY index.html vite.config.js ./
 COPY src ./src
 RUN npm run build
 
-FROM nginx:stable-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:stable-alpine AS runtime
 # Substitute only the upstream setting, preserving nginx's own variables.
 ENV NGINX_ENVSUBST_FILTER=^BACKEND_URL$
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
-EXPOSE 80
+EXPOSE 8080

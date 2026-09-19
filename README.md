@@ -32,10 +32,35 @@ empty; existing Homebrew data is not imported. Nginx proxies browser `/api`
 requests to `backend:8080`, preserving session cookies and CSRF. Backend JDBC
 uses `db:3306`. Neither database nor backend publishes a host port. Flyway applies
 V1–V4 to the new database, and Hibernate validates the resulting schema.
-Database readiness gates backend startup; the frontend healthcheck verifies
+Database readiness gates backend startup, and backend health gates frontend
+startup. The frontend healthcheck verifies
 that the proxied backend CSRF endpoint responds before `up --wait` succeeds.
 The market key is optional for startup but needed for populated valuations and
 analytics. Authentication uses sessions, so there is no JWT signing secret.
+
+The Compose backend activates `prod`: required datasource environment values,
+SQL logging disabled, HttpOnly/SameSite=Lax session cookies, and secure cookies
+by default. Local HTTP Compose explicitly sets `SESSION_COOKIE_SECURE=false`.
+For HTTPS deployment retain secure cookies and configure trusted proxy handling
+for the selected ingress; this local Compose file is not a public TLS setup.
+Local configuration imports are disabled in Compose.
+
+Backend and frontend run as non-root with read-only root filesystems, writable
+temporary directories, all capabilities dropped, and no privilege escalation.
+MySQL uses its official initialization entrypoint, then runs the server as the
+mysql user; its volume remains writable. Nginx listens on container port 8080.
+All services log to stdout/stderr with Docker log rotation (three 10 MB files).
+Backend/frontend health probes check HTTP availability; the database probe runs
+a real SQL query. These probes are not comprehensive business-health checks.
+
+Before public deployment, configure TLS and trusted proxy handling, database
+backups, and platform-managed secret injection. Environment variables are suitable
+for this local stack but remain visible to administrators with Docker access.
+Sessions are held in one backend process; restarts require login again, and
+multiple replicas need a shared session strategy. Release builds should pin
+base-image digests, scan vulnerabilities, and target the deployment CPU
+architecture; the locally verified images are Linux ARM64. No cloud resources
+are created by this setup.
 
 ```sh
 # Logs
@@ -45,6 +70,13 @@ docker compose --env-file .env.docker restart
 # Stop and remove containers, preserving database contents
 docker compose --env-file .env.docker down
 # Recreate containers with the same persisted database
+docker compose --env-file .env.docker up -d --wait
+```
+
+To deliberately reset the database (deletes all Compose accounts and portfolios):
+
+```sh
+docker compose --env-file .env.docker down --volumes
 docker compose --env-file .env.docker up -d --wait
 ```
 
@@ -279,7 +311,6 @@ ownership, and persistence integration tests cover those through the full suite:
 ```
 
 The full suite requires the configured local MySQL database. Integration fixtures
-are rolled back, but Hibernate's schema-update setting can still update tables.
+are rolled back, but Flyway startup can apply pending migrations.
 Results are written to `backend/target/surefire-reports/`. Never use a production
-database for tests. Market-provider responses remain mocked. Flyway migrations
-are a separate future step; no schema migration was added in this testing change.
+database for tests. Market-provider responses remain mocked. Flyway owns schema evolution; Hibernate validates the resulting schema.

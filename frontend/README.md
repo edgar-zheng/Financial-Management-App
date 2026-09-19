@@ -6,7 +6,7 @@ From the repository root:
 
 ```sh
 docker build -t portfolio-frontend:local frontend
-docker run --rm --name portfolio-frontend -p 8081:80 \
+docker run --rm --name portfolio-frontend -p 8081:8080 \
   -e BACKEND_URL=http://host.docker.internal:8080 portfolio-frontend:local
 ```
 
@@ -20,7 +20,7 @@ container on a shared Docker network, pass `--network <network>` and set
 Nginx substitutes it at container startup; changing it requires recreating the
 container, not rebuilding the JavaScript. Browser requests stay on relative
 `/api` URLs, preserving session cookies and CSRF behavior. The production server
-is nginx, not Vite. Unknown client routes return `index.html`; API responses and
+is unprivileged nginx on container port 8080, not Vite. Unknown client routes return `index.html`; API responses and
 missing built assets do not use the SPA fallback.
 
 The build context is `frontend/`, with an allowlist in `.dockerignore`; local

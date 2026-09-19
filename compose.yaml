@@ -1,5 +1,11 @@
 name: portfolio
 
+x-logging: &bounded-logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   db:
     image: mysql:26.7.0
@@ -17,12 +23,16 @@ services:
       retries: 30
       start_period: 30s
     restart: unless-stopped
+    logging: *bounded-logging
 
   backend:
     build:
       context: .
       dockerfile: backend/Dockerfile
     environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_CONFIG_IMPORT: ""
+      SESSION_COOKIE_SECURE: "false" # This Compose stack is local HTTP only.
       SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/${MYSQL_DATABASE:?Set MYSQL_DATABASE}
       SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:?Set MYSQL_USER}
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD}
@@ -34,7 +44,19 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, --output, /dev/null, --max-time, "3", http://127.0.0.1:8080/api/auth/csrf]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     restart: unless-stopped
+    logging: *bounded-logging
 
   frontend:
     build:
@@ -42,18 +64,25 @@ services:
     environment:
       BACKEND_URL: http://backend:8080
     ports:
-      - "127.0.0.1:${FRONTEND_PORT:-8081}:80"
+      - "127.0.0.1:${FRONTEND_PORT:-8081}:8080"
     depends_on:
       backend:
-        condition: service_started
+        condition: service_healthy
         restart: true
     healthcheck:
-      test: [CMD-SHELL, 'wget -q -O /dev/null http://127.0.0.1/api/auth/csrf']
+      test: [CMD-SHELL, 'wget -q -O /dev/null http://127.0.0.1:8080/api/auth/csrf']
       interval: 5s
       timeout: 5s
       retries: 30
       start_period: 20s
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /etc/nginx/conf.d:uid=101,gid=101,mode=0755
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    logging: *bounded-logging
 
 volumes:
   mysql_data:

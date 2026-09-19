@@ -16,6 +16,13 @@
 **/application-secrets.*
 **/*.pem
 **/*.key
+**/*.p12
+**/*.pfx
+**/*.jks
+**/.aws
+**/application-env.properties
+**/application-local.*
+**/application-dev.*
 **/.git
 **/.idea
 **/.vscode
