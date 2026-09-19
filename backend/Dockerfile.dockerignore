@@ -1,0 +1,39 @@
+# Dockerfile-specific ignore file; paths are relative to the repository root.
+# Allow only the wrapper, Maven project, and production source/resources.
+**
+!mvnw
+!.mvn/
+!.mvn/wrapper/
+!.mvn/wrapper/maven-wrapper.properties
+!backend/
+!backend/pom.xml
+!backend/src/
+!backend/src/main/
+!backend/src/main/**
+
+# Exclusions also apply inside the allowed source tree.
+**/.git
+**/.idea
+**/.vscode
+**/.settings
+**/.DS_Store
+**/*.iml
+**/target
+**/build
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+**/application-env.properties
+**/application-secrets.*
+**/application-local.*
+**/application-dev.*
+**/secrets
+**/.aws
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*.jks
+**/*.log
+**/*.session.sql
