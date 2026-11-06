@@ -1,6 +1,7 @@
 package com.edgar.portfolio.config;
 
 import org.springframework.context.annotation.Bean;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -15,9 +16,25 @@ import tools.jackson.databind.json.JsonMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Map;
+import java.util.List;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 public class SecurityConfiguration {
+	@Bean
+	UrlBasedCorsConfigurationSource corsConfigurationSource(@Value("${app.frontend-url}") String frontendUrl) {
+		var cors = new CorsConfiguration();
+		cors.setAllowedOrigins(List.of(frontendUrl));
+		cors.setAllowCredentials(true);
+		cors.validateAllowCredentials();
+		cors.setAllowedMethods(List.of("GET", "POST", "PUT", "OPTIONS"));
+		cors.setAllowedHeaders(List.of("Content-Type", "X-CSRF-TOKEN"));
+		var source = new UrlBasedCorsConfigurationSource();
+		source.registerCorsConfiguration("/api/**", cors);
+		return source;
+	}
+
 	@Bean
 	PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
 
@@ -32,9 +49,12 @@ public class SecurityConfiguration {
 	}
 
 	@Bean
-	SecurityFilterChain securityFilterChain(HttpSecurity http, JsonMapper json) throws Exception {
+	SecurityFilterChain securityFilterChain(HttpSecurity http, JsonMapper json,
+			UrlBasedCorsConfigurationSource corsConfigurationSource) throws Exception {
 		// CSRF remains enabled, including registration, login, and logout.
-		http.authorizeHttpRequests(auth -> auth
+		http.cors(cors -> cors.configurationSource(corsConfigurationSource))
+			.authorizeHttpRequests(auth -> auth
+				.requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/auth/csrf").permitAll()
 				.requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
 				.anyRequest().authenticated())
