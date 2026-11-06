@@ -1,5 +1,26 @@
 # Frontend workflow and verification
 
+## Backend URL
+
+Vite reads `.env` from the **repository root**, alongside `mvnw`. Set the backend
+origin (no `/api` suffix), for example:
+
+```properties
+VITE_API_BASE_URL=https://your-backend.example.com
+```
+
+Restart `npm run dev` after editing it. Production builds embed this value, so
+rebuild after changing it. Only `VITE_` variables are exposed to browser code;
+never use that prefix for secrets. If unset or empty, requests remain relative
+and use the existing Vite `/api` proxy locally or the production reverse proxy.
+
+All API and CSRF calls use this base URL and include session cookies. For direct
+cross-origin requests, the backend must allow the exact frontend origin through
+`FRONTEND_URL` and credentialed CORS. Cross-site sessions require HTTPS and
+`SESSION_COOKIE_SAME_SITE=none` with `SESSION_COOKIE_SECURE=true`; browser
+third-party-cookie restrictions can still block them. CSRF remains enabled.
+No backend settings are changed by this frontend configuration.
+
 ## Production Docker image
 
 From the repository root:
@@ -17,6 +38,7 @@ container on a shared Docker network, pass `--network <network>` and set
 `BACKEND_URL=http://<backend-container-name>:8080` instead.
 
 `BACKEND_URL` is required and must be an origin with no trailing slash or path.
+Leave `VITE_API_BASE_URL` unset when building for this same-origin proxy setup.
 Nginx substitutes it at container startup; changing it requires recreating the
 container, not rebuilding the JavaScript. Browser requests stay on relative
 `/api` URLs, preserving session cookies and CSRF behavior. The production server

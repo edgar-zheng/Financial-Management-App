@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { apiFetch } from './api.js'
+import { apiFetch, createApiFetch } from './api.js'
 
 test('mutations obtain a fresh CSRF token and send session cookies', async () => {
   const original = globalThis.fetch
@@ -18,7 +18,33 @@ test('mutations obtain a fresh CSRF token and send session cookies', async () =>
     assert.equal(calls[1].options.headers.get('X-CSRF-TOKEN'), 'token-1')
     assert.equal(calls[3].options.headers.get('X-CSRF-TOKEN'), 'token-3')
     assert.equal(calls[3].options.headers.get('Content-Type'), 'application/json')
-    assert.equal(calls[3].options.credentials, 'same-origin')
+    assert.ok(calls.every(call => call.options.credentials === 'include'))
+  } finally { globalThis.fetch = original }
+})
+
+test('configured backend receives both CSRF and API requests with session cookies', async () => {
+  const original = globalThis.fetch
+  const calls = []
+  const remoteFetch = createApiFetch(' https://backend.example.com/ ')
+  const controller = new AbortController()
+  globalThis.fetch = async (path, options) => {
+    calls.push({ path, options })
+    return path.endsWith('/api/auth/csrf')
+      ? new Response(JSON.stringify({ headerName: 'X-CSRF-TOKEN', token: 'remote-token' }))
+      : new Response(null, { status: 204 })
+  }
+  try {
+    await remoteFetch('/api/portfolios', { method: 'POST', signal: controller.signal })
+    await remoteFetch('/api/portfolios/1/holdings')
+    assert.deepEqual(calls.map(call => call.path), [
+      'https://backend.example.com/api/auth/csrf',
+      'https://backend.example.com/api/portfolios',
+      'https://backend.example.com/api/portfolios/1/holdings',
+    ])
+    assert.ok(calls.every(call => call.options.credentials === 'include'))
+    assert.equal(calls[1].options.headers.get('X-CSRF-TOKEN'), 'remote-token')
+    assert.equal(calls[0].options.signal, controller.signal)
+    assert.equal(calls[1].options.signal, controller.signal)
   } finally { globalThis.fetch = original }
 })
 
