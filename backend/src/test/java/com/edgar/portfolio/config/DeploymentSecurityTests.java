@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -49,13 +50,28 @@ class DeploymentSecurityTests {
     }
 
     @Test void configuredOriginCanPreflightWithCredentialsAndCsrfHeader() throws Exception {
-        mvc.perform(options("/api/portfolios/1/allocations")
+        for (String method : new String[] {"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"}) {
+            mvc.perform(options("/api/portfolios/1/allocations")
                 .header("Origin", "https://frontend.example.com")
-                .header("Access-Control-Request-Method", "PUT")
+                .header("Access-Control-Request-Method", method)
                 .header("Access-Control-Request-Headers", "content-type,x-csrf-token"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Access-Control-Allow-Origin", "https://frontend.example.com"))
                 .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
+        }
+    }
+
+    @Test void actualBootstrapPathIsPublicWhileRootCsrfHasNoController() throws Exception {
+        mvc.perform(get("/api/auth/csrf").header("Origin", "https://frontend.example.com"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.headerName").value("X-CSRF-TOKEN"))
+                .andExpect(jsonPath("$.token").isNotEmpty())
+                .andExpect(header().string("Access-Control-Allow-Origin", "https://frontend.example.com"))
+                .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
+        // The catch-all protects unknown paths before MVC can return its 404.
+        mvc.perform(get("/csrf")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/csrf").with(user("test@example.com"))).andExpect(status().isNotFound());
+        mvc.perform(get("/api/portfolios/1")).andExpect(status().isUnauthorized());
     }
 
     @Test void otherOriginsAreRejected() throws Exception {
