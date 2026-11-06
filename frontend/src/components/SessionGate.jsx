@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { apiFetch } from '../api.js'
+import { apiFetch, initializeCsrf } from '../api.js'
 
 export default function SessionGate({ children }) {
   const [showPassword, setShowPassword] = useState(false)
@@ -20,6 +20,7 @@ export default function SessionGate({ children }) {
     window.addEventListener('session-expired', expired)
     async function check() {
       try {
+        await initializeCsrf({ signal: controller.signal })
         const response = await apiFetch('/api/auth/me', { signal: controller.signal })
         if (response.ok) {
           const user = await response.json()
@@ -66,6 +67,7 @@ export default function SessionGate({ children }) {
       if (registering) {
         setRegistering(false); setMessage('Your account is ready. Sign in to create your first portfolio.'); passwordInput.current?.focus()
       } else {
+        await initializeCsrf()
         const me = await apiFetch('/api/auth/me')
         if (!me.ok) throw new Error('Unable to confirm your session. Please sign in again.')
         setAccount(await me.json())
@@ -81,6 +83,7 @@ export default function SessionGate({ children }) {
       const response = await apiFetch('/api/auth/logout', { method: 'POST' })
       if (!response.ok) throw new Error('Logout failed. Please retry.')
       setAccount(null); setPassword(''); setShowPassword(false); setRegistering(false); setMessage('You’ve been signed out.')
+      await initializeCsrf()
     } catch (error) { setError(error.message) }
     finally { setBusy(false) }
   }

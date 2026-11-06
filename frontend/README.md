@@ -1,5 +1,77 @@
 # Frontend workflow and verification
 
+## Backend URL
+
+Vite reads `.env` from the **repository root**, alongside `mvnw`. Set the backend
+origin (no `/api` suffix), for example:
+
+```properties
+VITE_API_BASE_URL=https://your-backend.example.com
+```
+
+Restart `npm run dev` after editing it. Production builds embed this value, so
+rebuild after changing it. Only `VITE_` variables are exposed to browser code;
+never use that prefix for secrets. If unset or empty, requests remain relative
+and use the existing Vite `/api` proxy locally or the production reverse proxy.
+
+All API and CSRF calls use this base URL and include session cookies. For direct
+cross-origin requests, the backend must allow the exact frontend origin through
+`FRONTEND_URL` and credentialed CORS. Cross-site sessions require HTTPS and
+`SESSION_COOKIE_SAME_SITE=none` with `SESSION_COOKIE_SECURE=true`; browser
+third-party-cookie restrictions can still block them. CSRF remains enabled.
+No backend settings are changed by this frontend configuration.
+
+## CSRF and Vercel deployment
+
+The existing anonymous token endpoint is **`/api/auth/csrf`**, not `/csrf`.
+The centralized client requests it on `VITE_API_BASE_URL` with credentials included,
+initializes it on app startup, refreshes after login/logout, and fetches a fresh token
+before each unsafe request. The backend's returned `headerName` and `token` are used
+directly; tokens are not saved in localStorage. CSRF remains enabled on registration,
+login, logout, and other mutations.
+
+On 2026-11-06, the deployed Vercel bundle still contained the older same-origin
+client. It requested
+`https://financial-management-app-one.vercel.app/api/auth/csrf` (404), while
+`https://d5xnufx0gsczd.cloudfront.net/api/auth/csrf` returned 200 with correct
+credentialed CORS for that Vercel origin. Adding another backend endpoint does not
+fix a stale frontend deployment. Backend runtime code does not need redeployment
+for this issue; the backend changes in this fix are regression tests only.
+
+In the existing Vercel project's settings, use Root Directory `frontend`, Vite,
+Build Command `npm run build`, Output Directory `dist`, and set the Production
+environment variable:
+
+```properties
+VITE_API_BASE_URL=https://d5xnufx0gsczd.cloudfront.net
+```
+
+Do not append `/api` or `/csrf`. Vercel builds now reject a missing or malformed
+backend origin. Environment variables are compiled into the bundle; changing the
+setting alone does not update an existing deployment.
+
+Deploy the current local source without making a Git commit by using the Vercel
+CLI from the **repository root**, linking to the existing project (do not create
+a new project):
+
+```sh
+npx vercel login
+npx vercel link
+npx vercel --prod --force \
+  --build-env VITE_API_BASE_URL=https://d5xnufx0gsczd.cloudfront.net
+```
+
+Alternatively, after reviewing and committing the changes yourself, deploy the
+new Git revision through Vercel. Redeploying the old revision will keep the old
+client. Do not commit `.vercel` metadata or local environment files.
+
+After deployment, check DevTools Request URL: it must be
+`https://d5xnufx0gsczd.cloudfront.net/api/auth/csrf`, HTTP 200, with `headerName`
+and `token` in its JSON. Verify registration, login, authenticated access, logout,
+and a second login. The live backend already passes those flows with the exact
+Vercel Origin, rejecting missing and stale tokens. Browser verification of the
+new Vercel bundle requires completing that frontend deployment.
+
 ## Production Docker image
 
 From the repository root:
@@ -17,6 +89,7 @@ container on a shared Docker network, pass `--network <network>` and set
 `BACKEND_URL=http://<backend-container-name>:8080` instead.
 
 `BACKEND_URL` is required and must be an origin with no trailing slash or path.
+Leave `VITE_API_BASE_URL` unset when building for this same-origin proxy setup.
 Nginx substitutes it at container startup; changing it requires recreating the
 container, not rebuilding the JavaScript. Browser requests stay on relative
 `/api` URLs, preserving session cookies and CSRF behavior. The production server

@@ -1,8 +1,8 @@
 # Portfolio Tracker
 
-For backend-only AWS deployment, see [Elastic Beanstalk setup](backend/deploy/ELASTIC_BEANSTALK.md).
+For backend-only AWS deployment, see [Elastic Beanstalk and CloudFront setup](backend/deploy/ELASTIC_BEANSTALK.md).
 It covers the Java 21 source bundle, Aiven environment properties, health checks,
-HTTPS, and connecting local React through a development proxy.
+CloudFront's default HTTPS domain, and the local React/Vercel handoff.
 
 Spring Boot backend and React frontend in one repository. The backend is in `backend/` (`pom.xml` and `src/`); the React application is in
 `frontend/`. The Maven wrapper (`mvnw`, `mvnw.cmd`, `.mvn/`) stays at the repository root.
