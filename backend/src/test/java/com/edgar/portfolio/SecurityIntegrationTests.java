@@ -23,6 +23,57 @@ class SecurityIntegrationTests {
 	@Autowired WebApplicationContext context;
 	@Autowired UserRepository users;
 	@Autowired PasswordEncoder encoder;
+	@Autowired tools.jackson.databind.json.JsonMapper json;
+
+	private record BrowserCsrf(MockHttpSession session, String header, String token) {}
+	private BrowserCsrf browserCsrf(org.springframework.test.web.servlet.MockMvc mvc, MockHttpSession session) throws Exception {
+		var request = get("/api/auth/csrf");
+		if (session != null) request.session(session);
+		var result = mvc.perform(request).andExpect(status().isOk())
+				.andExpect(jsonPath("$.headerName").value("X-CSRF-TOKEN"))
+				.andExpect(jsonPath("$.token").isNotEmpty()).andReturn();
+		var body = json.readTree(result.getResponse().getContentAsString());
+		return new BrowserCsrf((MockHttpSession) result.getRequest().getSession(false),
+				body.get("headerName").asText(), body.get("token").asText());
+	}
+
+	@Test
+	void browserTokensProtectRegistrationAndRotateAcrossLoginAndLogout() throws Exception {
+		var mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+		var anonymous = browserCsrf(mvc, null);
+		assertNotNull(anonymous.session());
+		String email = UUID.randomUUID() + "@example.com";
+		String password = "Test-only-password-123";
+		String body = "{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}";
+		mvc.perform(post("/api/auth/register").session(anonymous.session()).contentType(MediaType.APPLICATION_JSON).content(body))
+				.andExpect(status().isForbidden());
+		mvc.perform(post("/api/auth/register").session(anonymous.session()).header(anonymous.header(), "invalid")
+				.contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden());
+		mvc.perform(post("/api/auth/register").session(anonymous.session()).header(anonymous.header(), anonymous.token())
+				.contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isCreated());
+		mvc.perform(post("/api/auth/login").session(anonymous.session()).param("email", email).param("password", password))
+				.andExpect(status().isForbidden());
+		mvc.perform(post("/api/auth/login").session(anonymous.session()).header(anonymous.header(), anonymous.token())
+				.param("email", email).param("password", password)).andExpect(status().isNoContent());
+		mvc.perform(post("/api/portfolios").session(anonymous.session()).header(anonymous.header(), anonymous.token())
+				.contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Stale token\"}"))
+				.andExpect(status().isForbidden());
+		var authenticated = browserCsrf(mvc, anonymous.session());
+		mvc.perform(post("/api/portfolios").session(authenticated.session()).header(authenticated.header(), authenticated.token())
+				.contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Fresh token\"}"))
+				.andExpect(status().isCreated());
+		mvc.perform(post("/api/auth/logout").session(authenticated.session()).header(authenticated.header(), authenticated.token()))
+				.andExpect(status().isNoContent());
+		assertTrue(authenticated.session().isInvalid());
+		var loggedOut = browserCsrf(mvc, null);
+		mvc.perform(get("/api/auth/me").session(loggedOut.session())).andExpect(status().isUnauthorized());
+		mvc.perform(post("/api/auth/login").session(loggedOut.session()).header(authenticated.header(), authenticated.token())
+				.param("email", email).param("password", password)).andExpect(status().isForbidden());
+		mvc.perform(post("/api/auth/login").session(loggedOut.session()).header(loggedOut.header(), loggedOut.token())
+				.param("email", email).param("password", password)).andExpect(status().isNoContent());
+		browserCsrf(mvc, loggedOut.session());
+		mvc.perform(get("/api/auth/me").session(loggedOut.session())).andExpect(status().isOk());
+	}
 	@Test
 	void registrationLoginProtectedAccessAndLogout() throws Exception {
 		var mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();

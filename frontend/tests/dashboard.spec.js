@@ -52,6 +52,15 @@ async function openPortfolio(page) {
 }
 
 test('login, find, create confirmation and logout preserve the workflow', async ({ page }) => {
+  const securityEvents = []
+  page.on('request', request => {
+    if (new URL(request.url()).pathname === '/api/auth/csrf') securityEvents.push('csrf')
+  })
+  page.on('response', response => {
+    const path = new URL(response.url()).pathname
+    if (response.status() === 204 && path === '/api/auth/login') securityEvents.push('login')
+    if (response.status() === 204 && path === '/api/auth/logout') securityEvents.push('logout')
+  })
   await mockApi(page, { signedIn: false })
   await page.goto('/')
   await page.screenshot({ path: 'test-results/login.png', fullPage: true })
@@ -60,6 +69,8 @@ test('login, find, create confirmation and logout preserve the workflow', async 
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
   await page.screenshot({ path: 'test-results/selection.png', fullPage: true })
   await page.getByLabel('Portfolio ID', { exact: true }).fill('999')
+  expect(securityEvents[0]).toBe('csrf')
+  expect(securityEvents.lastIndexOf('csrf')).toBeGreaterThan(securityEvents.indexOf('login'))
   await page.getByRole('button', { name: 'Open portfolio' }).click()
   await expect(page.getByRole('alert')).toContainText('not found')
   await expect(page.getByRole('alert')).not.toContainText('internal')
@@ -74,6 +85,7 @@ test('login, find, create confirmation and logout preserve the workflow', async 
   await expect(page.getByRole('heading', { name: 'Long-Term Investments' })).toBeVisible()
   await page.getByRole('button', { name: 'Sign out' }).click()
   await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible()
+  await expect.poll(() => securityEvents.lastIndexOf('csrf')).toBeGreaterThan(securityEvents.indexOf('logout'))
 })
 
 test('chart modes, precise targets, failed save, success and confirmed reset', async ({ page }) => {

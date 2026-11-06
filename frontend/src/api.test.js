@@ -63,3 +63,36 @@ test('unauthorized protected GET notifies UI without retrying', async () => {
     assert.equal(events.length, 1)
   } finally { globalThis.fetch = original; globalThis.window = originalWindow }
 })
+
+test('all unsafe methods use the returned header name and a fresh token', async () => {
+  const original = globalThis.fetch
+  const calls = []
+  globalThis.fetch = async (path, options) => {
+    calls.push({ path, options })
+    return path.endsWith('/csrf')
+      ? new Response(JSON.stringify({ headerName: 'X-APPLICATION-CSRF', token: `fresh-${calls.length}` }))
+      : new Response(null, { status: 204 })
+  }
+  try {
+    const remoteFetch = createApiFetch('https://backend.example.com')
+    for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+      await remoteFetch('/api/resource', { method })
+      const last = calls.at(-1)
+      assert.equal(last.options.headers.get('X-APPLICATION-CSRF'), `fresh-${calls.length - 1}`)
+      assert.equal(last.options.headers.has('X-CSRF-TOKEN'), false)
+    }
+    assert.equal(calls.length, 8)
+  } finally { globalThis.fetch = original }
+})
+
+test('failed or malformed CSRF initialization never sends a mutation', async () => {
+  const original = globalThis.fetch
+  try {
+    for (const response of [new Response(null, { status: 404 }), new Response(JSON.stringify({ token: 'missing-header-name' }))]) {
+      let calls = 0
+      globalThis.fetch = async () => { calls++; return response }
+      await assert.rejects(apiFetch('/api/auth/register', { method: 'POST' }), /backend URL/)
+      assert.equal(calls, 1)
+    }
+  } finally { globalThis.fetch = original }
+})
